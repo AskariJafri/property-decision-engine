@@ -178,3 +178,11 @@ def test_an_unknown_origin_is_not_allowed():
         headers={"Origin": "https://evil.example", "Access-Control-Request-Method": "POST"},
     )
     assert "access-control-allow-origin" not in response.headers
+
+
+def test_health_answers_head_as_well_as_get():
+    """Monitors and load balancers probe with HEAD. A health endpoint that
+    returns 405 to them reports itself unhealthy while being perfectly fine —
+    which is exactly what happened in CI, twice."""
+    assert client.head("/api/v1/health").status_code == 200
+    assert client.get("/api/v1/health").status_code == 200

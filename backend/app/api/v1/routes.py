@@ -37,7 +37,10 @@ RULES = default_rule_set()
 SERVICE = AnalysisService(RULES)
 
 
-@router.get("/health")
+# GET and HEAD both: uptime monitors, load balancers and wait-on probe with
+# HEAD, and a health check that answers 405 reads as "unhealthy" to every one
+# of them. This cost two CI runs to a service that was up the whole time.
+@router.api_route("/health", methods=["GET", "HEAD"])
 async def health() -> dict[str, Any]:
     settings = get_settings()
     return {
