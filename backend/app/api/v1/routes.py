@@ -10,12 +10,13 @@ from __future__ import annotations
 from datetime import UTC, date, datetime
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, File, HTTPException, Query, UploadFile
 
 from app.core.config import get_settings
 from app.engines.financial.rules_seed import default_rule_set
 from app.engines.scoring.contracts import SCORING_MODEL_VERSION
 from app.ingestion.deterministic import parse as parse_listing_text
+from app.ingestion.documents import UnsupportedDocumentError, extract_text
 from app.provenance.policy import REGISTRY
 from app.providers.openrouteservice import OpenRouteServiceProvider
 from app.providers.osm import NominatimGeocoder, OsrmRouter
@@ -30,6 +31,7 @@ from app.services.analysis_service import AnalysisService, LocationFacts
 router = APIRouter(prefix="/api/v1")
 
 JURISDICTION = Query(default="ON/Toronto")
+UPLOADED_FILE = File(...)
 AS_OF = Query(default=None)
 RULES = default_rule_set()
 SERVICE = AnalysisService(RULES)
@@ -237,6 +239,45 @@ async def parse_listing(request: ParseListingRequest) -> ParseListingResponse:
         evidence=result.evidence,
         rejected=result.rejected,
         read_by=result.model_id,
+        requires_confirmation=True,
+        note=note,
+    )
+
+
+@router.post("/listings/parse-document", response_model=ParseListingResponse)
+async def parse_listing_document(file: UploadFile = UPLOADED_FILE) -> ParseListingResponse:
+    """Read a listing from a document the user saved.
+
+    The intended flow is: open the listing in your own browser, print it to PDF,
+    upload the file. You viewed a page you were entitled to view and saved what
+    you saw — no automated retrieval, and the text layer a browser writes is
+    exact rather than inferred.
+    """
+    content = await file.read()
+    try:
+        text = extract_text(content, file.content_type or "", filename=file.filename or "")
+    except UnsupportedDocumentError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    result = parse_listing_text(text)
+    found = len(result.fields)
+    note = (
+        f"Read {found} field{'s' if found != 1 else ''} from {file.filename or 'that file'}. "
+        "Check each one against the source shown beside it before analysing — this is a "
+        "draft, not a fact."
+        if found
+        else (
+            f"Nothing recognisable was found in {file.filename or 'that file'}. The text "
+            "came through, but none of it matched a field we read. Enter the details "
+            "manually."
+        )
+    )
+    return ParseListingResponse(
+        fields=result.fields,
+        fields_as_cents=result.as_cents(),
+        evidence=result.evidence,
+        rejected=result.rejected,
+        read_by=f"{result.model_id} (from document)",
         requires_confirmation=True,
         note=note,
     )

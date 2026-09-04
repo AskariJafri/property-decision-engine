@@ -17,7 +17,13 @@ import {
   usableRows,
   type ComparableRow,
 } from "@/components/ComparablesInput";
-import { analyze, parseListing, type AnalyzeResponse, type ParsedListing } from "@/lib/api";
+import {
+  analyze,
+  parseListing,
+  parseListingDocument,
+  type AnalyzeResponse,
+  type ParsedListing,
+} from "@/lib/api";
 
 const DOLLARS = (value: string) => Math.round(Number(value.replace(/[^0-9.]/g, "")) * 100);
 
@@ -59,13 +65,9 @@ export default function Home() {
   // Reading a listing fills the form; it never analyses anything on its own. The
   // user sees every value next to the text it came from and confirms by pressing
   // Analyse — nothing is trusted before that (ADR 0002 §2).
-  async function onRead() {
-    setBusy(true);
-    setError(null);
-    try {
-      const result = await parseListing(listing);
-      setParsed(result);
-      const f = result.fields;
+  function applyParsed(result: ParsedListing) {
+    setParsed(result);
+    const f = result.fields;
       setForm((current) => ({
         ...current,
         price: f.listing_price !== undefined ? String(f.listing_price) : current.price,
@@ -82,11 +84,33 @@ export default function Home() {
           f.monthly_condo_fee !== undefined ? String(f.monthly_condo_fee) : current.condoFee,
         // A stated condo fee means it is a condo, whatever the dropdown says.
         kind: f.monthly_condo_fee !== undefined ? "condo_apartment" : current.kind,
-      }));
+    }));
+  }
+
+  async function onRead() {
+    setBusy(true);
+    setError(null);
+    try {
+      applyParsed(await parseListing(listing));
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not read that.");
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function onUpload(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setBusy(true);
+    setError(null);
+    try {
+      applyParsed(await parseListingDocument(file));
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Could not read that file.");
+    } finally {
+      setBusy(false);
+      event.target.value = "";
     }
   }
 
@@ -176,14 +200,26 @@ export default function Home() {
           placeholder="Offered at $849,000. 3 bedrooms, 2.5 bathrooms, 1,450 sq ft. Built in 1998..."
           className="w-full border border-line rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent/40"
         />
-        <button
-          type="button"
-          onClick={onRead}
-          disabled={busy || !listing.trim()}
-          className="border border-accent text-accent px-4 py-1.5 rounded text-sm disabled:opacity-40"
-        >
-          Read this listing
-        </button>
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            onClick={onRead}
+            disabled={busy || !listing.trim()}
+            className="border border-accent text-accent px-4 py-1.5 rounded text-sm disabled:opacity-40"
+          >
+            Read this listing
+          </button>
+
+          <span className="text-xs text-muted">or</span>
+
+          {/* Print the listing to PDF from your own browser and drop it here.
+              Two clicks, no copying, and nothing fetched on your behalf. */}
+          <label className="border border-accent text-accent px-4 py-1.5 rounded text-sm cursor-pointer">
+            Upload a saved PDF
+            <input type="file" accept=".pdf,.txt,.md" onChange={onUpload} className="hidden" />
+          </label>
+          <span className="text-xs text-muted">Ctrl+P on the listing → Save as PDF</span>
+        </div>
 
         {parsed && (
           <div className="text-sm space-y-2">

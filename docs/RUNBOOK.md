@@ -72,6 +72,27 @@ npx playwright test
 
 ---
 
+## Getting a listing into the form
+
+Three ways in, in order of how well they work:
+
+1. **Print to PDF and upload.** Open the listing in your browser, `Ctrl+P` → *Save
+   as PDF*, then use **Upload a saved PDF**. A browser's PDF carries a real text
+   layer, so values are lifted exactly and shown back with the characters they came
+   from. Two clicks and nothing is fetched on your behalf.
+2. **Paste the text.** Select the listing details, paste, press *Read this listing*.
+3. **Type it in.** Always available.
+
+**There is no URL field, deliberately.** REALTOR.ca and the consumer portals
+prohibit automated retrieval, and *Century 21 Canada v. Rogers*, 2011 BCSC 1196
+held those terms enforceable, found the copying infringing and granted an
+injunction. You may read a page you are entitled to read and save what you saw;
+the product will not go and get it for you. See ADR 0002 §2.
+
+**Screenshots are not supported** and say so when uploaded: a PNG has no text
+layer, so reading it needs OCR or a vision model. Printing to PDF gives exact text
+instead of a guess at pixels.
+
 ## Turn on the optional pieces
 
 ### The local model (AI explanations and listing extraction)

@@ -141,3 +141,26 @@ export async function parseListing(text: string): Promise<ParsedListing> {
   if (!response.ok) throw new Error("Could not read that listing text.");
   return (await response.json()) as ParsedListing;
 }
+
+/**
+ * Read a listing from a document the user saved.
+ *
+ * The intended flow: open the listing in your own browser, print it to PDF, drop
+ * the file here. No automated retrieval, and a browser's PDF has a real text
+ * layer so the values come out exactly rather than being inferred from pixels.
+ */
+export async function parseListingDocument(file: File): Promise<ParsedListing> {
+  const form = new FormData();
+  form.append("file", file);
+  const response = await fetch(`${API_BASE}/api/v1/listings/parse-document`, {
+    method: "POST",
+    body: form,
+  });
+  if (!response.ok) {
+    const problem = await response.json().catch(() => ({ detail: "Could not read that file." }));
+    throw new Error(
+      typeof problem.detail === "string" ? problem.detail : "Could not read that file.",
+    );
+  }
+  return (await response.json()) as ParsedListing;
+}
