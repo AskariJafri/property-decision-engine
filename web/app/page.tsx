@@ -184,6 +184,30 @@ export default function Home() {
 
         <fieldset className="grid gap-4 sm:grid-cols-3">
           <legend className="text-sm uppercase tracking-wide text-muted mb-2">The property</legend>
+          {/* Municipality is not cosmetic: Toronto charges a second land transfer
+              tax worth about $9,000 on this file, and each city sets its own
+              property tax rate. Defaulting it silently would be a wrong number
+              dressed as a precise one. */}
+          <label className="flex flex-col gap-1">
+            <span className="text-xs uppercase tracking-wide text-muted">Municipality</span>
+            <select
+              value={form.jurisdiction}
+              onChange={(event) => setForm({ ...form, jurisdiction: event.target.value })}
+              className="border border-line rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-accent/40"
+            >
+              <option value="ON/Toronto">Toronto</option>
+              <option value="ON/Mississauga">Mississauga</option>
+              <option value="ON/Ottawa">Ottawa</option>
+              <option value="ON/Other">Elsewhere in Ontario</option>
+            </select>
+            <span className="text-xs text-muted">
+              {form.jurisdiction === "ON/Toronto"
+                ? "Toronto charges a second land transfer tax."
+                : form.jurisdiction === "ON/Other"
+                  ? "We have no tax rate for that municipality, so property tax will be reported as unavailable."
+                  : "Provincial land transfer tax only."}
+            </span>
+          </label>
           <Field label="Asking price" value={form.price} onChange={set("price")} />
           <Field label="Square feet" value={form.squareFeet} onChange={set("squareFeet")} />
           <Field label="Year built" value={form.yearBuilt} onChange={set("yearBuilt")} />

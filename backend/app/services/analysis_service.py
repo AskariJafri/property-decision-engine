@@ -150,8 +150,13 @@ class AnalysisService:
 
         # --- score ------------------------------------------------------------------
         preferences = request.preferences
+        # Anything the ownership cost could not include understates the monthly
+        # figure, which would otherwise flatter the affordability score.
+        missing_costs = tuple(
+            _cost_name(fact.provenance.unavailable_reason or "") for fact in ownership.unavailable
+        )
         subscores = [
-            affordability_subscore(affordability.value),
+            affordability_subscore(affordability.value, missing_cost_components=missing_costs),
             value_subscore(
                 asking_cents=property_.purchase_price_cents, fair_value=fair_value.value
             ),
@@ -350,6 +355,16 @@ def _bucket(factors: dict[str, list[FactorOut]], factor: Factor) -> None:
         sentence=factor.sentence,
     )
     factors["positive" if factor.direction.value == "positive" else "negative"].append(out)
+
+
+def _cost_name(reason: str) -> str:
+    """Turn an unavailable reason into the phrase a user will recognise."""
+    lowered = reason.lower()
+    if "tax" in lowered:
+        return "property tax"
+    if "condo" in lowered:
+        return "the condo fee"
+    return "a cost component"
 
 
 def _opt_cents(value: int | None) -> Cents | None:

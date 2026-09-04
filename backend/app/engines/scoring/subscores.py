@@ -62,8 +62,17 @@ def apply_capped(score: Decimal, adjustment: CappedAdjustment | None) -> Decimal
     return score + adjustment.applied_adjustment
 
 
-def affordability_subscore(result: AffordabilityResult) -> Subscore:
-    """Four sub-metrics, weighted, from the household's own numbers."""
+def affordability_subscore(
+    result: AffordabilityResult, *, missing_cost_components: tuple[str, ...] = ()
+) -> Subscore:
+    """Four sub-metrics, weighted, from the household's own numbers.
+
+    ``missing_cost_components`` matters more than it looks. If property tax or a
+    condo fee could not be determined, the monthly cost is understated, and an
+    understated cost makes a house look *more* affordable. That is the one
+    direction a missing value must never move a score, so the gap is named in a
+    factor and paid for in confidence.
+    """
     housing = curves.piecewise(result.housing_ratio, curves.HOUSING_RATIO)
     debt = curves.piecewise(result.total_debt_ratio, curves.TOTAL_DEBT_RATIO)
     reserve = curves.piecewise(result.reserve_months, curves.RESERVE_MONTHS)
@@ -127,9 +136,21 @@ def affordability_subscore(result: AffordabilityResult) -> Subscore:
             )
         )
 
-    # Confidence is high here: these are our own calculations over the user's own
-    # figures, not third-party data.
-    return _scored(Component.AFFORDABILITY, score, Decimal("0.95"), tuple(factors))
+    # Our own arithmetic over the user's own figures, so confidence starts high —
+    # and drops hard for each cost we could not determine, because the score would
+    # otherwise reward the gap.
+    confidence = Decimal("0.95") - Decimal("0.2") * len(missing_cost_components)
+    for missing in missing_cost_components:
+        factors.append(
+            _factor(
+                Component.AFFORDABILITY,
+                False,
+                "15",
+                f"The monthly cost excludes {missing}, so it is understated and this "
+                "score is optimistic by that amount.",
+            )
+        )
+    return _scored(Component.AFFORDABILITY, score, confidence, tuple(factors))
 
 
 def value_subscore(*, asking_cents: int, fair_value: FairValueRange) -> Subscore:

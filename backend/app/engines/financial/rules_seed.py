@@ -323,6 +323,24 @@ def default_rules() -> tuple[Rule, ...]:
         ),
         # --- Closing cost estimates -------------------------------------------------
         Rule(
+            jurisdiction="ON/Ottawa",
+            name="property_tax.residential_rate",
+            value={"rate": "0.012271", "year": 2026},
+            effective_from=date(2026, 1, 1),
+            source_url="https://ottawa.ca/en/living-ottawa/taxes/property-taxes",
+            verification=Verification.SECONDARY,
+            note="Re-verify against the City of Ottawa by-law before launch.",
+        ),
+        Rule(
+            jurisdiction="ON/Mississauga",
+            name="property_tax.residential_rate",
+            value={"rate": "0.010339", "year": 2026},
+            effective_from=date(2026, 1, 1),
+            source_url="https://www.mississauga.ca/services-and-programs/property-taxes/",
+            verification=Verification.SECONDARY,
+            note="Re-verify against the City of Mississauga by-law before launch.",
+        ),
+        Rule(
             jurisdiction="ON",
             name="closing.estimates",
             value={
