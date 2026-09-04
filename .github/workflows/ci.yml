@@ -147,13 +147,22 @@ jobs:
       # job then sat for half an hour until it was cancelled by hand.
       - name: Start API and web
         run: |
-          (cd backend && nohup uvicorn app.main:app --port 8000 > /tmp/api.log 2>&1 &)
+          echo "uvicorn: $(command -v uvicorn || echo 'NOT ON PATH')"
+          (cd backend && nohup uvicorn app.main:app --host 127.0.0.1 --port 8000 > /tmp/api.log 2>&1 &)
           (cd web && nohup npx next start -p 3000 > /tmp/web.log 2>&1 &)
+          sleep 8
+          # Printed before wait-on, not after: if the API died on startup its
+          # traceback is the answer, and waiting ninety seconds to find that out
+          # costs a whole run.
+          echo "--- api.log ---"; cat /tmp/api.log || true
+          echo "--- web.log ---"; cat /tmp/web.log || true
           npx --yes wait-on -t 90000 http://127.0.0.1:8000/api/v1/health http://127.0.0.1:3000
 
       - name: Server logs on failure
         if: failure()
-        run: tail -50 /tmp/api.log /tmp/web.log || true
+        # -n 50, not -50: GNU tail rejects the obsolete form with several files,
+        # so the diagnostic step was itself failing and printing nothing.
+        run: tail -n 50 /tmp/api.log /tmp/web.log || true
 
       - run: npx playwright install --with-deps chromium
         working-directory: web
