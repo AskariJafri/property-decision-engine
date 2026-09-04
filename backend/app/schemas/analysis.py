@@ -210,3 +210,25 @@ class AnalyzeResponse(BaseModel):
         "This analysis is for informational purposes and is not financial, mortgage, legal, "
         "tax, insurance, or home-inspection advice."
     )
+
+
+class ParseListingRequest(BaseModel):
+    """Text the user already has. We never fetch a URL (ADR 0002 §2)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    text: str = Field(min_length=1, max_length=40_000)
+    source_url: str | None = None
+    """Recorded for the user's own reference, and never retrieved."""
+
+
+class ParseListingResponse(BaseModel):
+    fields: dict[str, Any]
+    fields_as_cents: dict[str, int]
+    evidence: dict[str, str]
+    """The exact span each value was read from, so the user can check it."""
+
+    rejected: dict[str, str]
+    read_by: str
+    requires_confirmation: bool = True
+    note: str

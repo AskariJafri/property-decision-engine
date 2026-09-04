@@ -115,3 +115,29 @@ export const COMPONENT_LABELS: Record<string, string> = {
   risk: "Risk",
   market: "Market conditions",
 };
+
+export interface ParsedListing {
+  fields: Record<string, number | string>;
+  fields_as_cents: Record<string, number>;
+  evidence: Record<string, string>;
+  rejected: Record<string, string>;
+  read_by: string;
+  requires_confirmation: boolean;
+  note: string;
+}
+
+/**
+ * Read a listing the user pasted.
+ *
+ * There is no URL parameter on purpose: the portals prohibit automated
+ * collection, so the user pastes what they are already looking at (ADR 0002 §2).
+ */
+export async function parseListing(text: string): Promise<ParsedListing> {
+  const response = await fetch(`${API_BASE}/api/v1/listings/parse`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text }),
+  });
+  if (!response.ok) throw new Error("Could not read that listing text.");
+  return (await response.json()) as ParsedListing;
+}

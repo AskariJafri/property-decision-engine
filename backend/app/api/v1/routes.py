@@ -15,8 +15,14 @@ from fastapi import APIRouter, HTTPException, Query
 from app.core.config import get_settings
 from app.engines.financial.rules_seed import default_rule_set
 from app.engines.scoring.contracts import SCORING_MODEL_VERSION
+from app.ingestion.deterministic import parse as parse_listing_text
 from app.provenance.policy import REGISTRY
-from app.schemas.analysis import AnalyzeRequest, AnalyzeResponse
+from app.schemas.analysis import (
+    AnalyzeRequest,
+    AnalyzeResponse,
+    ParseListingRequest,
+    ParseListingResponse,
+)
 from app.services.analysis_service import AnalysisService
 
 router = APIRouter(prefix="/api/v1")
@@ -115,3 +121,37 @@ async def reference_sources() -> dict[str, Any]:
             for policy in REGISTRY.values()
         ]
     }
+
+
+@router.post("/listings/parse", response_model=ParseListingResponse)
+async def parse_listing(request: ParseListingRequest) -> ParseListingResponse:
+    """Read a listing the user pasted, and hand back a draft for them to confirm.
+
+    There is deliberately no URL to fetch. REALTOR.ca and the consumer portals
+    prohibit automated collection, and *Century 21 Canada v. Rogers*, 2011 BCSC
+    1196 held those terms enforceable and the copying infringing (ADR 0002 §2). So
+    the user pastes what they are already looking at, which produces the same data
+    with none of the exposure.
+
+    The deterministic pattern pass runs first and needs no model. Where it cannot
+    reach, a local model can be configured to fill the gaps — and nothing from
+    either path is stored until the user confirms it.
+    """
+    result = parse_listing_text(request.text)
+    found = len(result.fields)
+    note = (
+        f"Read {found} field{'s' if found != 1 else ''} from the text you pasted. "
+        "Check each one against the source shown beside it before analysing — this "
+        "is a draft, not a fact."
+        if found
+        else "Nothing recognisable was found in that text. Enter the details manually."
+    )
+    return ParseListingResponse(
+        fields=result.fields,
+        fields_as_cents=result.as_cents(),
+        evidence=result.evidence,
+        rejected=result.rejected,
+        read_by=result.model_id,
+        requires_confirmation=True,
+        note=note,
+    )

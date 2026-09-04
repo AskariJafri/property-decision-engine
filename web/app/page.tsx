@@ -11,7 +11,7 @@
 import { useState } from "react";
 
 import { Factors, Money, NotChecked, BuyScore, ScoreBreakdown, Working } from "@/components/Analysis";
-import { analyze, type AnalyzeResponse } from "@/lib/api";
+import { analyze, parseListing, type AnalyzeResponse, type ParsedListing } from "@/lib/api";
 
 const DOLLARS = (value: string) => Math.round(Number(value.replace(/[^0-9.]/g, "")) * 100);
 
@@ -41,6 +41,32 @@ export default function Home() {
   const [result, setResult] = useState<AnalyzeResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [listing, setListing] = useState("");
+  const [parsed, setParsed] = useState<ParsedListing | null>(null);
+
+  // Reading a listing fills the form; it never analyses anything on its own. The
+  // user sees every value next to the text it came from and confirms by pressing
+  // Analyse — nothing is trusted before that (ADR 0002 §2).
+  async function onRead() {
+    setBusy(true);
+    setError(null);
+    try {
+      const result = await parseListing(listing);
+      setParsed(result);
+      const f = result.fields;
+      setForm((current) => ({
+        ...current,
+        price: f.listing_price !== undefined ? String(f.listing_price) : current.price,
+        bedrooms: f.bedrooms !== undefined ? String(f.bedrooms) : current.bedrooms,
+        squareFeet: f.square_feet !== undefined ? String(f.square_feet) : current.squareFeet,
+        yearBuilt: f.year_built !== undefined ? String(f.year_built) : current.yearBuilt,
+      }));
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Could not read that.");
+    } finally {
+      setBusy(false);
+    }
+  }
 
   const set = (key: keyof typeof INITIAL) => (event: React.ChangeEvent<HTMLInputElement>) =>
     setForm({ ...form, [key]: event.target.value });
@@ -98,6 +124,58 @@ export default function Home() {
 
   return (
     <div className="space-y-10">
+      <section className="border border-line rounded-lg p-4 space-y-3">
+        <h2 className="text-sm uppercase tracking-wide text-muted">
+          Paste a listing (optional)
+        </h2>
+        <p className="text-sm text-muted max-w-prose">
+          Copy the listing text and paste it here — we read what it states and fill the form
+          below. We do not fetch listing URLs: the portals prohibit it, so you paste what you
+          are already looking at.
+        </p>
+        <textarea
+          value={listing}
+          onChange={(event) => setListing(event.target.value)}
+          rows={5}
+          placeholder="Offered at $849,000. 3 bedrooms, 2.5 bathrooms, 1,450 sq ft. Built in 1998..."
+          className="w-full border border-line rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent/40"
+        />
+        <button
+          type="button"
+          onClick={onRead}
+          disabled={busy || !listing.trim()}
+          className="border border-accent text-accent px-4 py-1.5 rounded text-sm disabled:opacity-40"
+        >
+          Read this listing
+        </button>
+
+        {parsed && (
+          <div className="text-sm space-y-2">
+            <p className="text-muted">{parsed.note}</p>
+            {Object.keys(parsed.fields).length > 0 && (
+              <ul className="space-y-1">
+                {Object.entries(parsed.fields).map(([field, value]) => (
+                  <li key={field} className="text-xs">
+                    <span className="font-mono">{field}</span> = {String(value)}
+                    {parsed.evidence[field] && (
+                      <span className="text-muted"> — read from “{parsed.evidence[field]}”</span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+            {Object.entries(parsed.rejected).map(([field, reason]) => (
+              <p key={field} className="text-xs text-caution">
+                <span className="font-mono">{field}</span> ignored: {reason}
+              </p>
+            ))}
+            <p className="text-xs text-muted">
+              Read by {parsed.read_by}. Check each value against its source before analysing.
+            </p>
+          </div>
+        )}
+      </section>
+
       <form onSubmit={onSubmit} className="space-y-6">
         <p className="max-w-prose text-muted">
           Give us the property and your situation. Every number below is computed, sourced and
