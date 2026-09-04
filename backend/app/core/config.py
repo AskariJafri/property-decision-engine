@@ -9,7 +9,12 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", env_prefix="PDE_", extra="ignore")
+    # Both locations, repo root first so a backend/.env can override it. The API
+    # runs from backend/, and looking only there meant a .env sitting next to
+    # .env.example at the root was silently ignored.
+    model_config = SettingsConfigDict(
+        env_file=("../.env", ".env"), env_prefix="PDE_", extra="ignore"
+    )
 
     environment: Literal["local", "ci", "staging", "production"] = "local"
     debug: bool = False

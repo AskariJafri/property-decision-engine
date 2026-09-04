@@ -93,10 +93,19 @@ reproducible.
 
 The quickest way to make the Location score real, before committing to the OSM box.
 
-1. Get a free key at https://openrouteservice.org/dev/#/signup - 2,500 requests a
-   day, no card required.
-2. Put it in `.env` as `PDE_ORS_API_KEY=...` and restart the API.
-3. Fill in the property address and your work address in the form.
+1. Sign up at **https://openrouteservice.org/dev/#/signup** (a HeiGIT account).
+2. Go to **https://openrouteservice.org/dev/#/home**, open the **TOKENS** tab, and
+   request a free token at the bottom of the page.
+3. Put it in `.env` at the repo root: `PDE_ORS_API_KEY=your-token`.
+4. Restart the API, then check it took:
+   `curl http://localhost:8000/api/v1/health` — `providers_configured.openrouteservice`
+   should be `true`.
+5. Fill in the property address and your work address in the form.
+
+`providers_configured` means a key or URL reached the process, **not** that the
+service answers. Reachability is discovered at call time and degrades into the
+analysis with a reason, which is why a configured-but-not-running OSM box falls
+through to OpenRouteService rather than failing.
 
 You get a geocoded commute and a real Location subscore. Amenity counts still wait
 for Overpass, so the component scores at reduced confidence and says why - one

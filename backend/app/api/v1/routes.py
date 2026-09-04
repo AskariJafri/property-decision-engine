@@ -18,6 +18,7 @@ from app.engines.scoring.contracts import SCORING_MODEL_VERSION
 from app.ingestion.deterministic import parse as parse_listing_text
 from app.provenance.policy import REGISTRY
 from app.providers.openrouteservice import OpenRouteServiceProvider
+from app.providers.osm import NominatimGeocoder, OsrmRouter
 from app.schemas.analysis import (
     AnalyzeRequest,
     AnalyzeResponse,
@@ -43,6 +44,16 @@ async def health() -> dict[str, Any]:
         "pilot_jurisdiction": settings.pilot_jurisdiction,
         "scoring_model_version": SCORING_MODEL_VERSION,
         "rule_set": RULES.label,
+        # Configured, which is not the same as reachable: these say a key or URL
+        # reached the process, not that the service answers. Reachability is
+        # discovered at call time and degrades into the analysis with a reason.
+        "providers_configured": {
+            "openrouteservice": bool(settings.ors_api_key),
+            "nominatim": bool(settings.nominatim_url),
+            "routing": bool(settings.routing_url),
+            "overpass": bool(settings.overpass_url),
+            "local_model": bool(settings.llm_base_url),
+        },
     }
 
 
@@ -69,20 +80,42 @@ async def _resolve_location(request: AnalyzeRequest) -> LocationFacts:
     analysis that carries on without a Location score.
     """
     settings = get_settings()
-    provider = OpenRouteServiceProvider(settings.ors_api_key, settings.ors_base_url)
-
     address = request.property.address
     work = request.preferences.work_address
-    if not provider.configured:
-        return LocationFacts(
-            unavailable_reason="No OpenRouteService key is configured and the "
-            "self-hosted routing services are not running, so commute time could not "
-            "be measured. Set PDE_ORS_API_KEY to enable it."
-        )
     if not address or not work:
         return LocationFacts(
             unavailable_reason="Commute needs both the property address and your work "
             "address; one or both were not supplied."
+        )
+
+    # Self-hosted first: it is the production answer (ADR 0002), it has no quota,
+    # and its licence lets us store what it returns. OpenRouteService is the
+    # stopgap for anyone who has not built the box yet.
+    if settings.nominatim_url and settings.routing_url:
+        geocoder = NominatimGeocoder(settings.nominatim_url)
+        home = await geocoder.geocode(address)
+        office = await geocoder.geocode(work)
+        if home.is_available and office.is_available:
+            home_lat, home_lon = home.require()
+            work_lat, work_lon = office.require()
+            commute = await OsrmRouter(settings.routing_url).travel_minutes(
+                from_lat=home_lat,
+                from_lon=home_lon,
+                to_lat=work_lat,
+                to_lon=work_lon,
+                mode=request.preferences.commute_mode,
+            )
+            if commute.is_available:
+                return LocationFacts(commute_minutes=commute.require())
+        # Configured but not answering: fall through to ORS rather than give up.
+
+    provider = OpenRouteServiceProvider(settings.ors_api_key, settings.ors_base_url)
+    if not provider.configured:
+        return LocationFacts(
+            unavailable_reason="Commute could not be measured: the self-hosted routing "
+            "services are not reachable and no OpenRouteService key is configured. Get "
+            "a free key at https://openrouteservice.org/dev/#/signup and set "
+            "PDE_ORS_API_KEY in .env."
         )
 
     home = await provider.geocode(address)
