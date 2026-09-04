@@ -15,10 +15,15 @@ full working. Phases A–E are complete; F–K are partial and L has not started
 
 ![A completed analysis](docs/images/analysis-example.png)
 
+**Run it:** two terminals, no database or Docker required.
+
+```bash
+cd backend && .venv/Scripts/uvicorn app.main:app --reload --port 8000
+cd web     && npm run dev          # then open http://localhost:3000
 ```
-cd backend && python -m venv .venv && .venv/bin/pip install -e ".[dev]"
-ruff check . && mypy app && pytest -q
-```
+
+Full setup, tests and the optional local model and OpenStreetMap stack:
+[`docs/RUNBOOK.md`](docs/RUNBOOK.md).
 
 ---
 
@@ -39,6 +44,7 @@ ruff check . && mypy app && pytest -q
 | [`docs/decisions/0002-zero-cost-data-strategy.md`](docs/decisions/0002-zero-cost-data-strategy.md) | The $0 stack, and exactly what may and may not be collected automatically |
 | [`docs/decisions/0003-toronto-pilot.md`](docs/decisions/0003-toronto-pilot.md) | Toronto as pilot city, and the sources it unlocks |
 | [`docs/decisions/0004-ai-judgements.md`](docs/decisions/0004-ai-judgements.md) | How AI improves the decision without touching the arithmetic |
+| [`docs/RUNBOOK.md`](docs/RUNBOOK.md) | How to run it, test it, and switch on the optional pieces |
 | [`docs/ROADMAP.md`](docs/ROADMAP.md) | Phases A–L, the first four weeks, and V1–V10 |
 
 ## Principles
