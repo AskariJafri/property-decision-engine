@@ -11,6 +11,12 @@
 import { useState } from "react";
 
 import { Factors, Money, NotChecked, BuyScore, ScoreBreakdown, Working } from "@/components/Analysis";
+import {
+  ComparablesInput,
+  EMPTY_ROW,
+  usableRows,
+  type ComparableRow,
+} from "@/components/ComparablesInput";
 import { analyze, parseListing, type AnalyzeResponse, type ParsedListing } from "@/lib/api";
 
 const DOLLARS = (value: string) => Math.round(Number(value.replace(/[^0-9.]/g, "")) * 100);
@@ -22,6 +28,9 @@ const INITIAL = {
   squareFeet: "1450",
   yearBuilt: "1998",
   bedrooms: "3",
+  bathrooms: "2.5",
+  propertyTax: "",
+  condoFee: "",
   income: "190000",
   debts: "450",
   down: "120000",
@@ -43,6 +52,7 @@ export default function Home() {
   const [busy, setBusy] = useState(false);
   const [listing, setListing] = useState("");
   const [parsed, setParsed] = useState<ParsedListing | null>(null);
+  const [comps, setComps] = useState<ComparableRow[]>([{ ...EMPTY_ROW }]);
 
   // Reading a listing fills the form; it never analyses anything on its own. The
   // user sees every value next to the text it came from and confirms by pressing
@@ -60,6 +70,15 @@ export default function Home() {
         bedrooms: f.bedrooms !== undefined ? String(f.bedrooms) : current.bedrooms,
         squareFeet: f.square_feet !== undefined ? String(f.square_feet) : current.squareFeet,
         yearBuilt: f.year_built !== undefined ? String(f.year_built) : current.yearBuilt,
+        bathrooms: f.bathrooms !== undefined ? String(f.bathrooms) : current.bathrooms,
+        propertyTax:
+          f.annual_property_tax !== undefined
+            ? String(f.annual_property_tax)
+            : current.propertyTax,
+        condoFee:
+          f.monthly_condo_fee !== undefined ? String(f.monthly_condo_fee) : current.condoFee,
+        // A stated condo fee means it is a condo, whatever the dropdown says.
+        kind: f.monthly_condo_fee !== undefined ? "condo_apartment" : current.kind,
       }));
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not read that.");
@@ -85,6 +104,10 @@ export default function Home() {
             square_feet: Number(form.squareFeet) || null,
             year_built: Number(form.yearBuilt) || null,
             bedrooms: Number(form.bedrooms) || null,
+            bathrooms: form.bathrooms ? String(Number(form.bathrooms)) : null,
+            // A stated figure always beats our estimate from the municipal rate.
+            annual_property_tax_cents: form.propertyTax ? DOLLARS(form.propertyTax) : null,
+            monthly_condo_fee_cents: form.condoFee ? DOLLARS(form.condoFee) : null,
             has_parking: true,
           },
           buyer: {
@@ -111,7 +134,14 @@ export default function Home() {
             time_horizon: "5_to_10",
             risk_posture: "balanced",
           },
-          comparables: [],
+          comparables: usableRows(comps).map((row) => ({
+            address: row.address,
+            sale_price_cents: DOLLARS(row.price),
+            sale_date: row.date,
+            square_feet: Number(row.squareFeet) || null,
+            bedrooms: Number(row.bedrooms) || null,
+            distance_m: Number(row.distance) || null,
+          })),
         }),
       );
     } catch (caught) {
@@ -212,6 +242,28 @@ export default function Home() {
           <Field label="Square feet" value={form.squareFeet} onChange={set("squareFeet")} />
           <Field label="Year built" value={form.yearBuilt} onChange={set("yearBuilt")} />
           <Field label="Bedrooms" value={form.bedrooms} onChange={set("bedrooms")} />
+          <Field label="Bathrooms" value={form.bathrooms} onChange={set("bathrooms")} />
+          <label className="flex flex-col gap-1">
+            <span className="text-xs uppercase tracking-wide text-muted">Property type</span>
+            <select
+              value={form.kind}
+              onChange={(event) => setForm({ ...form, kind: event.target.value })}
+              className="border border-line rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-accent/40"
+            >
+              <option value="detached">Detached</option>
+              <option value="semi">Semi-detached</option>
+              <option value="townhouse">Townhouse</option>
+              <option value="condo_apartment">Condo apartment</option>
+              <option value="condo_town">Condo townhouse</option>
+              <option value="duplex">Duplex</option>
+            </select>
+          </label>
+          <Field
+            label="Annual property tax"
+            value={form.propertyTax}
+            onChange={set("propertyTax")}
+          />
+          <Field label="Monthly condo fee" value={form.condoFee} onChange={set("condoFee")} />
         </fieldset>
 
         <fieldset className="grid gap-4 sm:grid-cols-3">
@@ -239,6 +291,8 @@ export default function Home() {
             First-time buyer
           </label>
         </fieldset>
+
+        <ComparablesInput rows={comps} onChange={setComps} />
 
         <button
           type="submit"
