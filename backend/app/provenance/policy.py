@@ -152,6 +152,19 @@ TRCA = ProviderPolicy(
     "vs POTENTIAL and must not be flattened.",
 )
 
+OPENROUTESERVICE = ProviderPolicy(
+    key="src_openrouteservice",
+    name="OpenRouteService (HeiGIT)",
+    licence_class=LicenceClass.OPEN,
+    may_store_values=True,
+    attribution="© openrouteservice.org by HeiGIT | Map data © OpenStreetMap contributors",
+    source_url="https://openrouteservice.org/",
+    terms_url="https://openrouteservice.org/terms-of-service/",
+    notes="Free tier: 2,500 requests/day. The development stopgap named in ADR 0002; "
+    "the self-hosted OSM stack remains the production answer. Results derive from "
+    "OpenStreetMap under ODbL, so they are storable with attribution.",
+)
+
 USER_SUPPLIED = ProviderPolicy(
     key="src_user",
     name="User-supplied",
@@ -190,6 +203,7 @@ REGISTRY: dict[str, ProviderPolicy] = {
         CMHC,
         TORONTO_OPEN_DATA,
         TRCA,
+        OPENROUTESERVICE,
         USER_SUPPLIED,
         GOOGLE_MAPS,
         MLS_PORTALS,

@@ -22,6 +22,8 @@ import { analyze, parseListing, type AnalyzeResponse, type ParsedListing } from 
 const DOLLARS = (value: string) => Math.round(Number(value.replace(/[^0-9.]/g, "")) * 100);
 
 const INITIAL = {
+  address: "",
+  workAddress: "",
   price: "850000",
   jurisdiction: "ON/Toronto",
   kind: "detached",
@@ -70,6 +72,7 @@ export default function Home() {
         bedrooms: f.bedrooms !== undefined ? String(f.bedrooms) : current.bedrooms,
         squareFeet: f.square_feet !== undefined ? String(f.square_feet) : current.squareFeet,
         yearBuilt: f.year_built !== undefined ? String(f.year_built) : current.yearBuilt,
+        address: f.address !== undefined ? String(f.address) : current.address,
         bathrooms: f.bathrooms !== undefined ? String(f.bathrooms) : current.bathrooms,
         propertyTax:
           f.annual_property_tax !== undefined
@@ -99,6 +102,7 @@ export default function Home() {
         await analyze({
           property: {
             purchase_price_cents: DOLLARS(form.price),
+            address: form.address || null,
             jurisdiction: form.jurisdiction,
             property_kind: form.kind,
             square_feet: Number(form.squareFeet) || null,
@@ -130,6 +134,8 @@ export default function Home() {
             requires_parking: true,
             max_commute_minutes: Number(form.maxCommute) || null,
             commute_minutes: Number(form.commute) || null,
+            work_address: form.workAddress || null,
+            commute_mode: "car",
             goal: "primary_residence",
             time_horizon: "5_to_10",
             risk_posture: "balanced",
@@ -238,6 +244,18 @@ export default function Home() {
                   : "Provincial land transfer tax only."}
             </span>
           </label>
+          <Field
+            label="Property address"
+            value={form.address}
+            onChange={set("address")}
+            className="sm:col-span-2"
+          />
+          <Field
+            label="Your work address (for commute)"
+            value={form.workAddress}
+            onChange={set("workAddress")}
+            className="sm:col-span-2"
+          />
           <Field label="Asking price" value={form.price} onChange={set("price")} />
           <Field label="Square feet" value={form.squareFeet} onChange={set("squareFeet")} />
           <Field label="Year built" value={form.yearBuilt} onChange={set("yearBuilt")} />
@@ -323,13 +341,15 @@ function Field({
   label,
   value,
   onChange,
+  className = "",
 }: {
   label: string;
   value: string;
   onChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
+  className?: string;
 }) {
   return (
-    <label className="flex flex-col gap-1">
+    <label className={`flex flex-col gap-1 ${className}`}>
       <span className="text-xs uppercase tracking-wide text-muted">{label}</span>
       <input
         value={value}

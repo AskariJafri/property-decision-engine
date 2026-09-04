@@ -17,13 +17,14 @@ from app.engines.financial.rules_seed import default_rule_set
 from app.engines.scoring.contracts import SCORING_MODEL_VERSION
 from app.ingestion.deterministic import parse as parse_listing_text
 from app.provenance.policy import REGISTRY
+from app.providers.openrouteservice import OpenRouteServiceProvider
 from app.schemas.analysis import (
     AnalyzeRequest,
     AnalyzeResponse,
     ParseListingRequest,
     ParseListingResponse,
 )
-from app.services.analysis_service import AnalysisService
+from app.services.analysis_service import AnalysisService, LocationFacts
 
 router = APIRouter(prefix="/api/v1")
 
@@ -53,10 +54,61 @@ async def analyze(request: AnalyzeRequest) -> AnalyzeResponse:
     minimum, for instance — come back as 422 with the engine's own sentence, which
     is more useful to a buyer than a generic validation message.
     """
+    location = await _resolve_location(request)
     try:
-        return SERVICE.analyze(request, as_of=datetime.now(UTC).date())
+        return SERVICE.analyze(request, as_of=datetime.now(UTC).date(), location=location)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+async def _resolve_location(request: AnalyzeRequest) -> LocationFacts:
+    """Geocode both addresses and route between them.
+
+    Every failure here is a degradation, never an error: a missing key, an
+    unrecognised address or a routing outage produces a stated reason and an
+    analysis that carries on without a Location score.
+    """
+    settings = get_settings()
+    provider = OpenRouteServiceProvider(settings.ors_api_key, settings.ors_base_url)
+
+    address = request.property.address
+    work = request.preferences.work_address
+    if not provider.configured:
+        return LocationFacts(
+            unavailable_reason="No OpenRouteService key is configured and the "
+            "self-hosted routing services are not running, so commute time could not "
+            "be measured. Set PDE_ORS_API_KEY to enable it."
+        )
+    if not address or not work:
+        return LocationFacts(
+            unavailable_reason="Commute needs both the property address and your work "
+            "address; one or both were not supplied."
+        )
+
+    home = await provider.geocode(address)
+    if not home.is_available:
+        return LocationFacts(unavailable_reason=home.provenance.unavailable_reason)
+    office = await provider.geocode(work)
+    if not office.is_available:
+        return LocationFacts(unavailable_reason=office.provenance.unavailable_reason)
+
+    home_lat, home_lon = home.require()
+    work_lat, work_lon = office.require()
+    mode = request.preferences.commute_mode
+    commute = await provider.commute(
+        from_lat=home_lat,
+        from_lon=home_lon,
+        to_lat=work_lat,
+        to_lon=work_lon,
+        mode=mode,
+    )
+    if not commute.is_available:
+        return LocationFacts(unavailable_reason=commute.provenance.unavailable_reason)
+
+    return LocationFacts(
+        commute_minutes=commute.require(),
+        commute_is_estimated=mode == "transit",
+    )
 
 
 @router.get("/reference/rules")

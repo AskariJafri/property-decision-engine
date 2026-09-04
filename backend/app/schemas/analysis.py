@@ -53,6 +53,9 @@ class PropertyIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     purchase_price_cents: int = Field(gt=0)
+    address: str | None = Field(default=None, max_length=400)
+    """Geocoded for commute and location metrics. Never used to fetch a listing."""
+
     jurisdiction: str = "ON/Toronto"
     property_kind: Literal[
         "detached", "semi", "townhouse", "condo_apartment", "condo_town", "duplex", "other"
@@ -75,6 +78,10 @@ class PreferencesIn(BaseModel):
     requires_parking: bool | None = None
     max_commute_minutes: int | None = Field(default=None, gt=0)
     commute_minutes: int | None = Field(default=None, ge=0)
+    """Supplied by the user. A computed commute overrides it when we have one."""
+
+    work_address: str | None = Field(default=None, max_length=400)
+    commute_mode: Literal["car", "transit", "bike", "walk"] = "car"
     goal: Literal["primary_residence", "investment", "house_hack", "mixed"] | None = None
     time_horizon: Literal["under_3", "3_to_5", "5_to_10", "over_10"] | None = None
     risk_posture: Literal["conservative", "balanced", "aggressive"] | None = None

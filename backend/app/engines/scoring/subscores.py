@@ -288,6 +288,93 @@ def unavailable_fit() -> Subscore:
     )
 
 
+def location_subscore(
+    *,
+    commute_minutes: int | None,
+    max_commute_minutes: int | None,
+    commute_is_estimated: bool = False,
+    amenity_counts: dict[str, int] | None = None,
+) -> Subscore:
+    """Commute first, amenities second — which is the order buyers actually weigh.
+
+    Commute is the heaviest single input because it is the one a household pays
+    every working day for as long as they own the place. Amenity counts refine it.
+    With only one of the two available the component still scores, at reduced
+    confidence, because a known commute is worth more than nothing.
+    """
+    parts: list[tuple[Decimal, Decimal]] = []
+    factors: list[Factor] = []
+
+    if commute_minutes is not None:
+        if max_commute_minutes:
+            ratio = Decimal(commute_minutes) / Decimal(max_commute_minutes)
+            score = curves.piecewise(ratio, curves.COMMUTE_ADHERENCE)
+            factors.append(
+                _factor(
+                    Component.LOCATION,
+                    ratio <= 1,
+                    "15",
+                    f"A {commute_minutes} minute commute against the "
+                    f"{max_commute_minutes} minutes you set as your maximum.",
+                )
+            )
+        else:
+            # No stated maximum, so judge against what a commute costs in general.
+            score = curves.piecewise(
+                Decimal(commute_minutes) / Decimal(45), curves.COMMUTE_ADHERENCE
+            )
+            factors.append(
+                _factor(
+                    Component.LOCATION,
+                    commute_minutes <= 45,
+                    "10",
+                    f"A {commute_minutes} minute commute to your work address.",
+                )
+            )
+        parts.append((score, Decimal("0.65")))
+
+    if amenity_counts:
+        total = Decimal(sum(amenity_counts.values()))
+        parts.append((curves.piecewise(total, curves.AMENITY_COUNT), Decimal("0.35")))
+        factors.append(
+            _factor(
+                Component.LOCATION,
+                total >= 15,
+                "8",
+                f"{int(total)} everyday amenities within a short walk.",
+            )
+        )
+
+    if not parts:
+        from app.engines.scoring.engine import unavailable
+
+        return unavailable(
+            Component.LOCATION,
+            "No work address supplied and no location services configured, so commute "
+            "and amenities could not be measured.",
+        )
+
+    weight_total = sum(w for _, w in parts)
+    score = sum((s * w for s, w in parts), start=ZERO) / weight_total
+
+    # Confidence reflects coverage, not conviction: one input out of two is a real
+    # answer with half the evidence behind it.
+    confidence = Decimal("0.85") if len(parts) == 2 else Decimal("0.55")
+    if commute_is_estimated:
+        # A driving time standing in for a transit time is a weaker claim.
+        confidence *= Decimal("0.6")
+        factors.append(
+            _factor(
+                Component.LOCATION,
+                False,
+                "5",
+                "Transit timing is estimated from driving time; a real transit figure "
+                "needs the scheduled-service data.",
+            )
+        )
+    return _scored(Component.LOCATION, score, confidence, tuple(factors))
+
+
 def property_quality_subscore(
     *,
     year_built: int | None,

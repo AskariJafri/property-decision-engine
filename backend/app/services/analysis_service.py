@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from dataclasses import asdict
+from dataclasses import asdict, dataclass
 from datetime import date
 from decimal import Decimal
 from typing import Any
@@ -32,6 +32,7 @@ from app.engines.scoring.contracts import BuyScore, CappedAdjustment, Component,
 from app.engines.scoring.engine import aggregate, modifiers_for, unavailable
 from app.engines.scoring.subscores import (
     affordability_subscore,
+    location_subscore,
     personal_fit_subscore,
     property_quality_subscore,
     qualification_factors,
@@ -54,6 +55,21 @@ from app.schemas.analysis import (
 )
 
 
+@dataclass(frozen=True, slots=True)
+class LocationFacts:
+    """What the enrichment stage managed to resolve, already unwrapped.
+
+    Resolution happens in the route handler, which may do I/O. By the time the
+    service sees it, location is plain data — so the service stays synchronous and
+    the engines stay pure.
+    """
+
+    commute_minutes: int | None = None
+    commute_is_estimated: bool = False
+    amenity_counts: dict[str, int] | None = None
+    unavailable_reason: str | None = None
+
+
 class AnalysisService:
     def __init__(self, rules: RuleSet, financial: DeterministicFinancialEngine | None = None):
         self.rules = rules
@@ -67,6 +83,7 @@ class AnalysisService:
         risk_flags: tuple[RiskFlag, ...] = (),
         condition_adjustment: CappedAdjustment | None = None,
         risk_adjustment: CappedAdjustment | None = None,
+        location: LocationFacts | None = None,
     ) -> AnalyzeResponse:
         property_ = PropertyFinancials(
             purchase_price_cents=cents(request.property.purchase_price_cents),
@@ -167,14 +184,14 @@ class AnalysisService:
                 min_bathrooms=preferences.min_bathrooms,
                 has_parking=request.property.has_parking,
                 requires_parking=preferences.requires_parking,
-                commute_minutes=preferences.commute_minutes,
+                commute_minutes=(
+                    location.commute_minutes
+                    if location and location.commute_minutes is not None
+                    else preferences.commute_minutes
+                ),
                 max_commute_minutes=preferences.max_commute_minutes,
             ),
-            unavailable(
-                Component.LOCATION,
-                "Location metrics need the OpenStreetMap services, which are not "
-                "configured in this environment.",
-            ),
+            _location(location, preferences.max_commute_minutes),
             property_quality_subscore(
                 year_built=request.property.year_built,
                 as_of_year=as_of.year,
@@ -355,6 +372,24 @@ def _bucket(factors: dict[str, list[FactorOut]], factor: Factor) -> None:
         sentence=factor.sentence,
     )
     factors["positive" if factor.direction.value == "positive" else "negative"].append(out)
+
+
+def _location(location: LocationFacts | None, max_commute: int | None) -> Any:
+    """Build the location subscore, or say precisely why there is not one."""
+    if location is None or (location.commute_minutes is None and not location.amenity_counts):
+        reason = (
+            location.unavailable_reason
+            if location and location.unavailable_reason
+            else "No location services are configured, so commute and amenities could "
+            "not be measured."
+        )
+        return unavailable(Component.LOCATION, reason)
+    return location_subscore(
+        commute_minutes=location.commute_minutes,
+        max_commute_minutes=max_commute,
+        commute_is_estimated=location.commute_is_estimated,
+        amenity_counts=location.amenity_counts,
+    )
 
 
 def _cost_name(reason: str) -> str:

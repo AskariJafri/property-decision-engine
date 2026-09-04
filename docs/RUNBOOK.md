@@ -46,7 +46,7 @@ what the sections below are for.
 
 ```bash
 cd backend
-.venv/Scripts/python -m pytest -q          # 236 tests, no database needed
+.venv/Scripts/python -m pytest -q          # 265 tests, no database needed
 .venv/Scripts/python -m ruff check .
 .venv/Scripts/python -m ruff format --check .
 .venv/Scripts/python -m mypy app
@@ -88,6 +88,23 @@ analysis degrades honestly (ADR 0004).
 Pin the **exact tag**, never an alias like `llama3`: judgements are stored with the model id
 that produced them, and an alias that shifts under you breaks the replay that keeps scores
 reproducible.
+
+### A commute time in five minutes (OpenRouteService)
+
+The quickest way to make the Location score real, before committing to the OSM box.
+
+1. Get a free key at https://openrouteservice.org/dev/#/signup - 2,500 requests a
+   day, no card required.
+2. Put it in `.env` as `PDE_ORS_API_KEY=...` and restart the API.
+3. Fill in the property address and your work address in the form.
+
+You get a geocoded commute and a real Location subscore. Amenity counts still wait
+for Overpass, so the component scores at reduced confidence and says why - one
+input out of two is a real answer with half the evidence behind it.
+
+Note on transit: ORS has no public-transport profile, so a transit request is
+answered with driving time, labelled an estimate and discounted in confidence. A
+genuine transit figure needs GTFS, which arrives with the self-hosted stack.
 
 ### The OpenStreetMap stack (location, commute, amenities)
 

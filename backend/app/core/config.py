@@ -22,6 +22,12 @@ class Settings(BaseSettings):
     routing_url: str = ""
     overpass_url: str = ""
 
+    # OpenRouteService: the free-tier stopgap that makes the Location score real
+    # before the self-hosted OSM box exists (ADR 0002). Blank means no location
+    # data at all, which the analysis reports rather than guesses around.
+    ors_api_key: str = ""
+    ors_base_url: str = "https://api.openrouteservice.org"
+
     # Local model first (ADR 0004). Ollama speaks the OpenAI-compatible shape, so
     # moving to a free hosted tier later is a base-URL and model-name change. Blank
     # base URL means no model: judgements come back unavailable and the analysis
