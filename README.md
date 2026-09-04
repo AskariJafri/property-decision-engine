@@ -8,7 +8,13 @@ requirements with a property's details, computes the money deterministically, sc
 surfaces the risks worth investigating, and explains the result — labelling every number as
 verified, calculated, estimated, assumed, AI-inferred, or unavailable.
 
-**Status: Phase 0 (research and architecture). No application code exists yet.**
+**Status: Phase B (architecture) complete.** Docs, contracts and scaffold are in place; the
+engines are implemented in Phase D onward.
+
+```
+cd backend && python -m venv .venv && .venv/bin/pip install -e ".[dev]"
+ruff check . && mypy app && pytest -q
+```
 
 ---
 
@@ -21,10 +27,13 @@ verified, calculated, estimated, assumed, AI-inferred, or unavailable.
 | [`docs/architecture/ARCHITECTURE.md`](docs/architecture/ARCHITECTURE.md) | System shape, engines, provider abstractions, data model proposal |
 | [`docs/data/DATA_SOURCES.md`](docs/data/DATA_SOURCES.md) | Every candidate source, what it gives us, and in what order to integrate |
 | [`docs/data/DATA_LICENSING.md`](docs/data/DATA_LICENSING.md) | The licence gate — no source is integrated without a row here |
+| [`docs/DATABASE.md`](docs/DATABASE.md) | Schema, and the six things it refuses to allow |
+| [`docs/API.md`](docs/API.md) | REST contract: provenance envelopes, nullable Buy Score, unavailable-as-a-value |
 | [`docs/scoring/SCORING_MODEL.md`](docs/scoring/SCORING_MODEL.md) | Buy Score v0.1: components, weights, missing data, confidence, calibration plan |
 | [`docs/compliance/COMPLIANCE.md`](docs/compliance/COMPLIANCE.md) | FSRA, TRESA, AI regulation, PIPEDA, and the pre-launch checklist |
 | [`docs/decisions/0001-initial-architecture.md`](docs/decisions/0001-initial-architecture.md) | The eight decisions that shape everything after |
 | [`docs/decisions/0002-zero-cost-data-strategy.md`](docs/decisions/0002-zero-cost-data-strategy.md) | The $0 stack, and exactly what may and may not be collected automatically |
+| [`docs/decisions/0003-toronto-pilot.md`](docs/decisions/0003-toronto-pilot.md) | Toronto as pilot city, and the sources it unlocks |
 | [`docs/ROADMAP.md`](docs/ROADMAP.md) | Phases A–L, the first four weeks, and V1–V10 |
 
 ## Principles

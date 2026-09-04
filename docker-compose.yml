@@ -1,0 +1,74 @@
+# Development stack.
+#
+# The three OSM services are the location layer (ADR 0002). They import a
+# Geofabrik Ontario extract, which takes hours on first run and then costs
+# nothing — no API keys, no rate limits, and a licence that lets us store what we
+# derive. Start them early; they are the long pole in week one.
+#
+# A developer who is not working on location can run `docker compose up api db`
+# and let the adapters return "unavailable", which is a state the product handles
+# by design rather than a broken environment.
+
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    environment:
+      POSTGRES_USER: pde
+      POSTGRES_PASSWORD: pde
+      POSTGRES_DB: pde
+    ports: ["5432:5432"]
+    volumes: ["pgdata:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pde"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build: ./backend
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    environment:
+      PDE_ENVIRONMENT: local
+      PDE_DATABASE_URL: postgresql+asyncpg://pde:pde@db:5432/pde
+      PDE_NOMINATIM_URL: http://nominatim:8080
+      PDE_ROUTING_URL: http://osrm:5000
+      PDE_OVERPASS_URL: http://overpass:80
+    ports: ["8000:8000"]
+    volumes: ["./backend:/app"]
+    depends_on:
+      db:
+        condition: service_healthy
+
+  nominatim:
+    image: mediagis/nominatim:4.4
+    environment:
+      PBF_URL: https://download.geofabrik.de/north-america/canada/ontario-latest.osm.pbf
+      REPLICATION_URL: https://download.geofabrik.de/north-america/canada/ontario-updates/
+      IMPORT_WIKIPEDIA: "false"
+    ports: ["8081:8080"]
+    volumes: ["nominatim:/var/lib/postgresql/14/main"]
+    shm_size: 1gb
+    profiles: ["osm"]
+
+  osrm:
+    image: osrm/osrm-backend:latest
+    # Expects a pre-processed ontario-latest.osrm in ./data/osrm; see docs/RUNBOOK.md
+    command: osrm-routed --algorithm mld /data/ontario-latest.osrm
+    ports: ["5000:5000"]
+    volumes: ["./data/osrm:/data"]
+    profiles: ["osm"]
+
+  overpass:
+    image: wiktorn/overpass-api:latest
+    environment:
+      OVERPASS_MODE: init
+      OVERPASS_PLANET_URL: https://download.geofabrik.de/north-america/canada/ontario-latest.osm.pbf
+      OVERPASS_RULES_LOAD: "10"
+    ports: ["8082:80"]
+    volumes: ["overpass:/db"]
+    profiles: ["osm"]
+
+volumes:
+  pgdata:
+  nominatim:
+  overpass:

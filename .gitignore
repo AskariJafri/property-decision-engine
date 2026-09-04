@@ -29,3 +29,6 @@ coverage/
 # IDE
 .idea/
 .vscode/
+*.egg-info/
+build/
+dist/

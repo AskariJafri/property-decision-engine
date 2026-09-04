@@ -9,8 +9,8 @@ Each phase ends with: tests run, code reviewed, errors fixed, documentation upda
 
 | Phase | Theme | Exit criteria |
 |---|---|---|
-| **A ✅** | Research | This document set; owner has answered the five open questions |
-| **B** | Architecture | `DATABASE.md`, `API.md`, engine interfaces, `ProviderPolicy` contract, repo scaffold, CI green on an empty test suite |
+| **A ✅** | Research | The document set; pilot city and data budget answered (ADR 0002, 0003) |
+| **B ✅** | Architecture | `DATABASE.md`, `API.md`, engine contracts, `ProviderPolicy` registry, repo scaffold; CI green — ruff, ruff format, mypy strict, 41 tests |
 | **C** | Database | Alembic migrations for identity, property, provenance, analysis; migrations apply cleanly against Postgres in CI |
 | **D** | Financial engine | Mortgage, insurance premium, LTT/MLTT/NRST, ownership cost, qualification estimate, stress cases — all pure, all fixture-tested, rule registry seeded and dated |
 | **E** | Scoring engine | Subscores, weights, user modifiers, missing-data handling, confidence; reproducibility test passes across runs |
