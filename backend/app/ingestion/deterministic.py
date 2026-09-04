@@ -19,31 +19,43 @@ from __future__ import annotations
 
 import re
 
-from app.ingestion.listing import ExtractionResult, validate
+from app.ingestion.listing import BOUNDS, ExtractionResult, validate
 
 #: The decimals live INSIDE the capture group. Leaving them outside silently
 #: truncates "$612.50" to $612 — half a dollar a month, in a figure the whole
 #: affordability calculation rests on.
 _MONEY = r"\$?\s*([\d][\d,]{2,}(?:\.\d{1,2})?)"
 
-#: Each pattern names the field it fills. Order matters only within a field: the
-#: first pattern that matches wins, so the more specific ones come first.
+#: Each pattern names the field it fills. Within a field the first match wins, so
+#: the more specific patterns come first.
+#:
+#: **Label-first patterns come before digit-first ones**, and the digit-first ones
+#: allow only spaces and tabs rather than any whitespace. A digit-first pattern
+#: using ``\s*`` reaches backwards across a line break: given "Price: $1,299,000"
+#: followed by "Bedrooms: 4", it took the trailing zero of the price and reported
+#: bedrooms=0, after which bathrooms picked up the 4 — every field shifted by one
+#: and every one of them confidently wrong. A missing value is recoverable; a
+#: wrong one that looks right is not.
 PATTERNS: dict[str, tuple[str, ...]] = {
     "listing_price": (
+        # A reduced listing states both prices. The current one is what a buyer
+        # pays, so it is matched first; otherwise "was $999,000, now $899,900"
+        # takes the number the seller gave up on.
+        rf"(?:now|reduced to|new price|revised to)\D{{0,12}}{_MONEY}",
         rf"(?:asking|list(?:ed|ing)?|offered at|price[d]?(?: at)?)\D{{0,12}}{_MONEY}",
         rf"{_MONEY}\s*(?:asking|list price)",
     ),
     "bedrooms": (
-        r"(\d+)\s*(?:\+\s*\d+\s*)?(?:bed(?:room)?s?\b|\bbr\b|\bbd\b)",
-        r"bed(?:room)?s?\D{0,6}(\d+)",
+        r"bed(?:room)?s?\s*[:=\-]\s*(\d+)",
+        r"(\d+)(?:\s*\+\s*\d+)?[ \t]*(?:bed(?:room)?s?\b|\bbr\b|\bbd\b)",
     ),
     "bathrooms": (
-        r"(\d+(?:\.\d)?)\s*(?:bath(?:room)?s?\b|\bba\b)",
-        r"bath(?:room)?s?\D{0,6}(\d+(?:\.\d)?)",
+        r"bath(?:room)?s?\s*[:=\-]\s*(\d+(?:\.\d)?)",
+        r"(\d+(?:\.\d)?)[ \t]*(?:bath(?:room)?s?\b|\bba\b)",
     ),
     "square_feet": (
-        r"([\d,]{3,6})\s*(?:sq\.?\s*(?:ft|feet)|square\s*feet|sqft)",
-        r"(?:sq\.?\s*ft|size)\D{0,8}([\d,]{3,6})",
+        r"(?:sq\.?\s*ft|square\s*feet|sqft|size)\s*[:=\-]\s*(?:approx\.?\s*)?([\d,]{3,6})",
+        r"([\d,]{3,6})[ \t]*(?:sq\.?[ \t]*(?:ft|feet)|square[ \t]*feet|sqft)",
     ),
     "year_built": (
         r"(?:built|constructed|vintage|year built)\D{0,10}(\d{4})",
@@ -53,13 +65,21 @@ PATTERNS: dict[str, tuple[str, ...]] = {
         rf"(?:property\s*tax(?:es)?|annual\s*tax(?:es)?|taxes)\D{{0,15}}{_MONEY}",
     ),
     "monthly_condo_fee": (
-        rf"(?:condo\s*fee|maintenance\s*fee|common\s*element)\w*\D{{0,15}}{_MONEY}",
+        rf"(?:condo\s*fee|maint(?:enance)?\.?\s*fee|common\s*element\w*\s*fee|"
+        rf"strata\s*fee)\D{{0,15}}{_MONEY}",
     ),
     "parking_spaces": (
-        r"(\d+)\s*(?:car\s*)?(?:parking|garage)\b",
-        r"parking\D{0,8}(\d+)",
+        r"parking\s*[:=\-]\s*(\d+)",
+        r"(\d+)[ \t]*(?:car\s*)?(?:parking|garage)\b",
     ),
 }
+
+#: A listing usually leads with its price and often gives it no label at all —
+#: just "$899,900" across the top. Used only when no labelled pattern matched, and
+#: required to carry a dollar sign so it cannot mistake a floor area or a year for
+#: a price. The first plausible figure wins and its evidence span is shown, so a
+#: "reduced from" price is visible to the user rather than silently chosen.
+_BARE_PRICE = re.compile(r"\$\s*([\d][\d,]{2,}(?:\.\d{1,2})?)")
 
 #: Written-out counts, because "two car parking" and "three bedrooms" are ordinary
 #: listing English and a digits-only pass silently drops them.
@@ -93,6 +113,15 @@ def parse(text: str) -> ExtractionResult:
             if match:
                 raw[field] = match.group(1).replace(",", "")
                 spans[field] = _span(text, match.start(), match.end())
+                break
+
+    if "listing_price" not in raw:
+        low, high = BOUNDS["listing_price"]
+        for match in _BARE_PRICE.finditer(text):
+            candidate = float(match.group(1).replace(",", ""))
+            if low <= candidate <= high:
+                raw["listing_price"] = match.group(1).replace(",", "")
+                spans["listing_price"] = _span(text, match.start(), match.end())
                 break
 
     for field in WORD_FIELDS:

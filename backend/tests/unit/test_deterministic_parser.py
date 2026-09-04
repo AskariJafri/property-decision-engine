@@ -77,3 +77,45 @@ class TestRefusals:
         and nothing is rejected — the user simply enters the price themselves."""
         result = parse("Priced at $85 for a quick sale.")
         assert result.fields == {} and result.rejected == {}
+
+
+class TestRealListingLayouts:
+    """The shapes real listings actually come in, rather than the tidy prose one."""
+
+    def test_a_bare_price_with_no_keyword_is_still_found(self):
+        """Listings lead with the price and often give it no label at all. Requiring
+        a keyword meant the single most important field was the one most often
+        missed."""
+        result = parse("$899,900  3+1 Bed  2 Bath  1,450 sqft  Built 1998")
+        assert result.fields["listing_price"] == 899900
+        assert result.fields["bedrooms"] == 3  # "3+1" is three, plus a basement one
+
+    def test_a_label_table_does_not_shift_every_field_by_one(self):
+        """The bug this guards: a digit-first pattern reached back across the line
+        break, took the trailing zero of the price as the bedroom count, and let
+        bathrooms pick up the bedroom figure. Wrong, and confidently so."""
+        result = parse(
+            "Price: $1,299,000\nBedrooms: 4\nBathrooms: 3\n"
+            "Approx Sq Ft: 2000\nTaxes: $7,240.00 / 2025"
+        )
+        assert result.fields["listing_price"] == 1_299_000
+        assert result.fields["bedrooms"] == 4
+        assert result.fields["bathrooms"] == 3
+        assert result.fields["square_feet"] == 2000
+        assert result.fields["annual_property_tax"] == 7240
+
+    def test_pipe_separated_summaries_and_abbreviated_fees(self):
+        result = parse("$749,900 | 2 Bed | 2 Bath | 940 SqFt | Maint. Fee $612.50")
+        assert result.fields["listing_price"] == 749900
+        assert result.fields["monthly_condo_fee"] == 612.5
+
+    def test_a_reduced_price_takes_the_current_one(self):
+        """ "Was $999,000, now $899,900" — the buyer pays the second figure."""
+        result = parse("Was $999,000, now $899,900. 3 bed, 2 bath.")
+        assert result.fields["listing_price"] == 899900
+
+    def test_a_floor_area_is_never_mistaken_for_a_price(self):
+        """The bare-price fallback requires a dollar sign precisely so that a
+        four-digit floor area or a year cannot become the asking price."""
+        result = parse("Spacious 1,450 sq ft home built in 1998. Three bedrooms.")
+        assert "listing_price" not in result.fields
