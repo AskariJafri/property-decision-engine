@@ -32,3 +32,9 @@ coverage/
 *.egg-info/
 build/
 dist/
+node_modules/
+.next/
+out/
+test-results/
+playwright-report/
+.playwright-mcp/

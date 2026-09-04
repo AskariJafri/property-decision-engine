@@ -103,3 +103,49 @@ jobs:
 
       - name: Schema constraints hold (pytest)
         run: pytest tests/integration -q
+
+  frontend:
+    name: Frontend — types, build, E2E
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - run: npm ci
+        working-directory: web
+
+      - run: npx tsc --noEmit
+        working-directory: web
+
+      - run: npx next build
+        working-directory: web
+
+      - run: pip install -e ".[dev]"
+        working-directory: backend
+
+      # The E2E suite exists because of what it caught: the API had no CORS
+      # middleware, so every browser request died at the preflight while every
+      # server-side test passed. It runs against both servers, for real.
+      - name: Start API and web
+        run: |
+          (cd backend && uvicorn app.main:app --host 127.0.0.1 --port 8000 &)
+          (cd web && npx next start -p 3000 &)
+          npx --yes wait-on http://127.0.0.1:8000/api/v1/health http://127.0.0.1:3000
+
+      - run: npx playwright install --with-deps chromium
+        working-directory: web
+
+      - run: npx playwright test
+        working-directory: web

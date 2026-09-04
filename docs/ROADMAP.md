@@ -13,14 +13,14 @@ Each phase ends with: tests run, code reviewed, errors fixed, documentation upda
 | **B ✅** | Architecture | `DATABASE.md`, `API.md`, engine contracts, `ProviderPolicy` registry, repo scaffold; CI green — ruff, ruff format, mypy strict, 41 tests |
 | **C ✅** | Database | 29 tables across identity, property, provenance, analysis and the AI judgement channel; migration applies, round-trips, and its constraints are asserted against real Postgres in CI |
 | **D ✅** | Financial engine | Mortgage (semi-annual compounding), CMHC premium bands, Ontario LTT, Toronto MLTT incl. the 2026-04-01 luxury bands, NRST/MNRST, ownership cost, qualification and affordability — pure, traced, and covered by a 53-case fixture matrix across every price cliff |
-| **E** | Scoring engine | Subscores, weights, user modifiers, missing-data handling, confidence; reproducibility test passes across runs |
-| **F** | Backend API | Profile, property, analyze, scenarios, compare; OpenAPI published; auth, rate limits, redacted logging |
-| **G** | Frontend | Onboarding, dashboard, add property, analysis page, score breakdown, scenarios; the three data states (estimated / unavailable / low confidence) built before the happy path |
-| **H** | Property ingestion | Manual, PDF, image, pasted text; strict-schema extraction with mandatory user confirmation |
-| **I** | Location intelligence | Geocoding, commute, amenities, schools, transit; provider adapters with policy enforcement |
-| **J** | AI explanation | Fact-bundle prompt, validated JSON output, numeric-token guard, caching |
-| **K** | Testing | Financial fixtures at every price cliff, scoring regression, API tests, Playwright E2E, hallucination-prevention suite |
-| **L** | Deployment | Managed Postgres, migrations gated in CI, secrets from environment, observability dashboards |
+| **E ✅** | Scoring engine | Eight subscores, profile weight modifiers, drop-not-zero on missing data, the 35% withholding rule, confidence, and capped AI adjustments |
+| **F ◑** | Backend API | `POST /properties/analyze`, `/reference/rules`, `/reference/sources`, OpenAPI, CORS. **Not done:** auth, user accounts, persistence of analyses |
+| **G ◑** | Frontend | Next.js app: analysis form, score, money, factors, breakdown, the three data states, and the working. **Not done:** onboarding flow, dashboard, saved properties, comparison |
+| **H ◑** | Property ingestion | Extraction, validation, source anchoring, confirm-before-trust. **Not done:** PDF and image decoding, the API endpoints |
+| **I ◑** | Location intelligence | Nominatim, OSRM, Overpass, TRCA and Toronto adapters with degradation. **Not done:** wiring into the analysis (needs the OSM box), the scheduled Toronto import |
+| **J ◑** | AI explanation | OpenAI-compatible provider, judgement runtime with caps, the numeric guard. **Not done:** prompt tuning against a live model, wiring into the response |
+| **K ◑** | Testing | 236 backend tests, 3 Playwright E2E against real servers, migration constraints against real Postgres. **Not done:** calibration (`SCORING_MODEL.md` §9) |
+| **L ✗** | Deployment | CI covers lint, types, tests, migrations, build and E2E. **Not done:** hosting, managed Postgres, secrets, observability |
 
 ---
 

@@ -8,8 +8,12 @@ requirements with a property's details, computes the money deterministically, sc
 surfaces the risks worth investigating, and explains the result — labelling every number as
 verified, calculated, estimated, assumed, AI-inferred, or unavailable.
 
-**Status: Phase D (financial engine) complete.** The money is computed, traced and tested;
-scoring is Phase E.
+**Status: end-to-end walking skeleton.** A real analysis runs from a browser form through the
+API to the engines and back: Buy Score, money, factors, breakdown, missing-data states and the
+full working. Phases A–E are complete; F–K are partial and L has not started — see
+[`docs/ROADMAP.md`](docs/ROADMAP.md) for exactly what is and is not built.
+
+![A completed analysis](docs/images/analysis-example.png)
 
 ```
 cd backend && python -m venv .venv && .venv/bin/pip install -e ".[dev]"

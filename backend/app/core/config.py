@@ -40,6 +40,11 @@ class Settings(BaseSettings):
     # second city is a configuration change, not a rewrite.
     pilot_jurisdiction: str = "ON/Toronto"
 
+    # The browser sends a preflight before any cross-origin POST, so the API has
+    # to name the origins it will answer. Explicit list, never a wildcard: this
+    # endpoint receives a household's income and debts.
+    cors_origins: str = "http://localhost:3000,http://127.0.0.1:3000"
+
     session_secret: str = "dev-only-not-a-secret"
     analysis_rate_limit_per_hour: int = 10
     listing_parse_rate_limit_per_day: int = 20

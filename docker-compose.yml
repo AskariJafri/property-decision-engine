@@ -39,6 +39,15 @@ services:
       db:
         condition: service_healthy
 
+  web:
+    build: ./web
+    command: npm run dev
+    environment:
+      NEXT_PUBLIC_API_BASE: http://localhost:8000
+    ports: ["3000:3000"]
+    volumes: ["./web:/app", "/app/node_modules"]
+    depends_on: [api]
+
   nominatim:
     image: mediagis/nominatim:4.4
     environment:

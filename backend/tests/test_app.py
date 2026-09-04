@@ -155,3 +155,26 @@ def test_reference_sources_lists_the_prohibited_ones_too():
     prohibited = [s for s in sources if s["licence_class"] == "prohibited"]
     assert prohibited, "the refusal is part of the record"
     assert all(s["may_store_values"] is False for s in prohibited)
+
+
+def test_the_browser_preflight_is_answered():
+    """Found by driving the real page: without CORS the browser never gets past
+    the preflight, and the API looks fine to every test that is not a browser."""
+    response = client.options(
+        "/api/v1/properties/analyze",
+        headers={
+            "Origin": "http://localhost:3000",
+            "Access-Control-Request-Method": "POST",
+            "Access-Control-Request-Headers": "content-type",
+        },
+    )
+    assert response.status_code == 200
+    assert response.headers["access-control-allow-origin"] == "http://localhost:3000"
+
+
+def test_an_unknown_origin_is_not_allowed():
+    response = client.options(
+        "/api/v1/properties/analyze",
+        headers={"Origin": "https://evil.example", "Access-Control-Request-Method": "POST"},
+    )
+    assert "access-control-allow-origin" not in response.headers
