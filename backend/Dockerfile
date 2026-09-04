@@ -6,9 +6,15 @@ ENV PYTHONUNBUFFERED=1 \
 
 WORKDIR /app
 
-COPY pyproject.toml ./
+# Runtime dependencies only. Installing the dev extras would drag pytest, ruff,
+# mypy and the whole database stack into a production image that never uses them.
+COPY requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt uvicorn[standard]
+
 COPY app ./app
-RUN pip install --no-cache-dir -e ".[dev]"
 
 EXPOSE 8000
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+
+# Container hosts inject $PORT and health-check against it. Hardcoding 8000 makes
+# the deploy fail in a way that looks like a broken app rather than a bound port.
+CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]

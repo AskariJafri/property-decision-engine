@@ -1,0 +1,9 @@
+# Runtime only. The database stack (sqlalchemy, alembic, asyncpg, geoalchemy2)
+# is deliberately absent: nothing on the analyze path imports it, and shipping it
+# would quadruple a bundle that has to fit a free tier.
+fastapi>=0.115
+pydantic>=2.9
+pydantic-settings>=2.6
+httpx>=0.28
+python-multipart>=0.0.12
+pypdf>=5.1

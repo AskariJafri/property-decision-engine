@@ -45,6 +45,7 @@ Full setup, tests and the optional local model and OpenStreetMap stack:
 | [`docs/decisions/0003-toronto-pilot.md`](docs/decisions/0003-toronto-pilot.md) | Toronto as pilot city, and the sources it unlocks |
 | [`docs/decisions/0004-ai-judgements.md`](docs/decisions/0004-ai-judgements.md) | How AI improves the decision without touching the arithmetic |
 | [`docs/GLOSSARY.md`](docs/GLOSSARY.md) | Every term in plain language, for someone buying their first home |
+| [`docs/DEPLOY.md`](docs/DEPLOY.md) | Free hosting, and why a stateless analyze path makes it possible |
 | [`docs/RUNBOOK.md`](docs/RUNBOOK.md) | How to run it, test it, and switch on the optional pieces |
 | [`docs/ROADMAP.md`](docs/ROADMAP.md) | Phases A–L, the first four weeks, and V1–V10 |
 
