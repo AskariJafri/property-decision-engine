@@ -30,6 +30,9 @@ Assumes one engineer, no MLS data, pilot municipality chosen at the start of wee
 
 ### Week 1 — Foundation and the money that must be right
 - Repo scaffold per `/docs/architecture/ARCHITECTURE.md` §2; CI (ruff, mypy, pytest) green.
+- **Start the OSM box on day one** — Geofabrik Ontario extract importing into Nominatim, OSRM
+  and Overpass in the background while other work proceeds. The import takes hours; starting it
+  in week 3 would block week 3. OpenRouteService's free key covers development until it is up.
 - `DATABASE.md`, then Alembic migrations for `users`, `user_profiles`, `financial_profiles`,
   `buyer_preferences`, `properties`, `property_attributes`, `data_sources`, `data_provenance`.
 - Rule registry table plus the seed loader; load the `[PRIMARY]` rules from
@@ -67,8 +70,10 @@ Assumes one engineer, no MLS data, pilot municipality chosen at the start of wee
 - **Deliverable:** a person who is not us enters their situation and a real listing and gets a
   Buy Score they can explain to their partner without help.
 
-**Explicitly not in the first four weeks:** comparables, MLS, ML valuation, rent-vs-buy, property
-comparison, monitoring, mobile, payments.
+**Explicitly not in the first four weeks:** ML valuation, rent-vs-buy, property comparison,
+monitoring, mobile, payments. User-supplied comparables land in week 4 if the analysis page is
+ahead of schedule, week 5 otherwise — the similarity engine is small, and the Value Score is
+noticeably weak without it.
 
 ---
 
@@ -76,8 +81,8 @@ comparison, monitoring, mobile, payments.
 
 | Version | Theme |
 |---|---|
-| **V1** | The MVP above: analysis of one property against one household, no MLS |
-| **V2** | Licensed data — MPAC attributes, then board/VOW comparables; the comparable engine and a real Value Score |
+| **V1** | The MVP above: analysis of one property against one household, no MLS, user-supplied comparables |
+| **V2** | Depth on free data — more municipalities' zoning/development/flood layers, richer own-built location metrics, better cross-checks against open building and permit data |
 | **V3** | Statistical then ML valuation behind the unchanged `FairValueRange` interface |
 | **V4** | AI property search ("best 3-bed under $900k within 30 minutes of my office") |
 | **V5** | Rent vs buy over 5/10/15 years with labelled assumptions |
@@ -91,9 +96,15 @@ comparison, monitoring, mobile, payments.
 
 ## Dependencies that gate the version plan
 
-- **V2 requires** an MPAC agreement, and for comparables a brokerage/board relationship. Both
-  are commercial conversations, not engineering tasks, and should start during V1.
-- **V3 requires** a sold-transaction history of meaningful size — i.e. V2 running for a while.
-- **V4 requires** listing search, which requires MLS display rights — a different agreement from
-  the analysis rights V2 needs, and the point at which the DDF display-only rules become
-  relevant again.
+- **V1 requires** one OSM box and nothing else that costs money.
+- **V3 (statistical/ML valuation) requires** a sold-transaction history of meaningful size. The
+  free stack does not produce one: user-supplied comps are scoped to their own user and are not
+  pooled (`DATA_LICENSING.md` §3.6). So V3 is genuinely blocked until either the owner reverses
+  the zero-cost decision (MPAC, then a board/VOW relationship) or a consented, separately
+  licensed corpus exists. **This is the real cost of the free stack** — not the MVP, the
+  long-term valuation moat.
+- **V4 (AI property search) requires** listing search, which requires MLS display rights — a
+  fee and a brokerage relationship, and the point at which the DDF display-only rules bite
+  again. Not reachable on free data.
+- **V7 (agent dashboard)** should not ship before the independence question in
+  `PRODUCT_THESIS.md` §6 is settled structurally.

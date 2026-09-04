@@ -1,7 +1,10 @@
 # ADR 0001 — Initial architecture
 
 - **Date:** 2026-09-03
-- **Status:** Proposed (awaiting owner approval; no code written)
+- **Status:** Accepted, **partially superseded by [ADR 0002](0002-zero-cost-data-strategy.md)**
+  (2026-09-04), which removes every paid provider. Decisions 1, 2, 4, 5, 6, 7 and 8 stand
+  unchanged. Decision 3's *mechanism* stands; its Google-specific retention example no longer
+  applies, because the self-hosted OSM stack permits permanent storage.
 - **Context:** Phase 0 research, `/docs/research/RESEARCH_REPORT.md`
 
 ---

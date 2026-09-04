@@ -24,6 +24,7 @@ verified, calculated, estimated, assumed, AI-inferred, or unavailable.
 | [`docs/scoring/SCORING_MODEL.md`](docs/scoring/SCORING_MODEL.md) | Buy Score v0.1: components, weights, missing data, confidence, calibration plan |
 | [`docs/compliance/COMPLIANCE.md`](docs/compliance/COMPLIANCE.md) | FSRA, TRESA, AI regulation, PIPEDA, and the pre-launch checklist |
 | [`docs/decisions/0001-initial-architecture.md`](docs/decisions/0001-initial-architecture.md) | The eight decisions that shape everything after |
+| [`docs/decisions/0002-zero-cost-data-strategy.md`](docs/decisions/0002-zero-cost-data-strategy.md) | The $0 stack, and exactly what may and may not be collected automatically |
 | [`docs/ROADMAP.md`](docs/ROADMAP.md) | Phases A–L, the first four weeks, and V1–V10 |
 
 ## Principles
@@ -36,13 +37,19 @@ verified, calculated, estimated, assumed, AI-inferred, or unavailable.
 The AI layer never performs financial arithmetic, never invents a number, and never overrides a
 deterministic result. It explains what the engines computed.
 
-## Two facts that shape the whole build
+## Three facts that shape the whole build
 
-1. **Ontario sold prices are not public.** CREA's DDF is display-only under its own rules; board
-   feeds require a licensed brokerage. The MVP therefore ships without MLS data and says so,
-   rather than pretending to a comparable analysis it cannot lawfully perform.
-2. **Some data may not be stored.** Google Maps content may not be cached beyond place IDs and
-   30-day coordinates, so licence terms are enforced by a code path, not by a policy document.
+1. **It costs $0 in data licence fees.** The location stack is self-hosted OpenStreetMap
+   (Nominatim + OSRM + Overpass) on an Ontario extract, which is both free and — unlike Google —
+   licensed to let us store what we compute. Everything else is government open data or supplied
+   by the user. See [ADR 0002](docs/decisions/0002-zero-cost-data-strategy.md).
+2. **Ontario sold prices are not public.** CREA's DDF is display-only under its own rules; board
+   feeds require a licensed brokerage. So comparables come from the user — the person already
+   entitled to see them — and analysis confidence rises with how many they supply.
+3. **We do not collect from sites that forbid it.** Not a preference: *Century 21 Canada v.
+   Rogers Communications*, 2011 BCSC 1196 held browse-wrap terms enforceable, found copyright
+   infringement in scraped listings, rejected fair dealing, and granted an injunction. Automated
+   collection from open-licensed government and OSM sources is permitted and used heavily.
 
 ## Not
 

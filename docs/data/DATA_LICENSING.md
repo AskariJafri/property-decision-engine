@@ -79,30 +79,46 @@ contradict it (`/docs/architecture/ARCHITECTURE.md` §5).
 | Class | `licensed` if contracted; **`prohibited` to bulk-collect via per-search access** |
 | Note | Per-search public access is not a data feed. Automating it would breach the terms and is out of scope by policy |
 
-### Google Maps Platform
+### OpenStreetMap, self-hosted (Nominatim + OSRM/Valhalla + Overpass) — **the location stack**
 | Field | Finding |
 |---|---|
-| Datasets | Geocoding, Places, Routes/Distance Matrix |
-| Commercial use | Permitted under the Maps Platform terms, pay-as-you-go |
-| **Caching** | Prohibited except as expressly permitted: **coordinates up to 30 consecutive calendar days**, then deletion; **place IDs indefinitely** |
-| Prohibited | Exporting, extracting or scraping content for use outside the services |
-| Attribution | Required per the terms wherever content is displayed |
-| **Class** | **`restricted`** — `may_store_values=False` except place IDs; `max_retention_days=30` for coordinates |
-| Consequence | Store place ID + our derived metrics. Never a table of cached Google fields |
+| Datasets | Geofabrik Ontario extract: addresses, street network, POIs |
+| Cost | $0 in fees; one VM |
+| Commercial use | Permitted |
+| Licence | **ODbL** — attribution required; share-alike attaches to derived *databases*, not to a "produced work" such as a rendered analysis page |
+| **Storage** | **Permanent.** Coordinates, POIs and our derived metrics may all be stored — the decisive advantage over Google |
+| Public-instance limits | Not applicable once self-hosted. The OSMF Nominatim policy explicitly directs geocoding-dependent applications to run their own service, and Overpass directs heavy users to planet downloads — self-hosting *is* the sanctioned path **[PRIMARY]** |
+| Attribution | "© OpenStreetMap contributors" wherever derived values are displayed |
+| Class | `open` with obligations |
+| Open question | Whether our stored derived metrics (walk scores, amenity counts) constitute a derived database triggering share-alike. `NEEDS COUNSEL`. Mitigation if it does: publish the derived metric table, which costs us nothing we care about |
 
-### Local Logic
+### OpenRouteService (development stopgap only)
 | Field | Finding |
 |---|---|
-| Datasets | Location scores, demographics, neighbourhood profiles, climate |
-| Cost | From ~$500/month **[SECONDARY]** |
-| Restrictions | Contract-specific; confirm redistribution and caching rights before design |
-| Class | `licensed` (pending contract) |
+| Free tier | 2,500 requests/day, 40,000/month, 40 concurrent, covering directions, matrix, isochrones, geocoding **[SECONDARY]** |
+| Class | `open` within quota |
+| Note | Development and early users only; the self-hosted stack is the production answer |
 
-### Walk Score
+### Google Maps Platform — **not used**
 | Field | Finding |
 |---|---|
-| Restriction | Free API is for consumer-facing applications; subscription sites directed to Enterprise **[SECONDARY]** |
-| Class | `restricted` pending written clarification; treat as `prohibited` until then |
+| Why not | Costs money, and its caching rules forbid the durable coordinate storage the schema wants |
+| Terms (for the record) | Coordinates cacheable **30 consecutive days** then deletion; **place IDs indefinitely**; no export or scraping of content for use outside the services |
+| Class | `restricted` — retained here so that a future decision to adopt it inherits the constraint rather than rediscovering it |
+
+### Local Logic / Walk Score — **not used**
+| Field | Finding |
+|---|---|
+| Local Logic | From ~$500/month **[SECONDARY]**. Replaced by our own metrics over self-hosted OSM |
+| Walk Score | Free API restricted to consumer-facing applications; paid products directed to Enterprise **[SECONDARY]**. Replaced by our own walkability metric |
+| Class | `prohibited` by policy — not for legal reasons, because they cost money |
+
+### GTFS feeds (municipal transit agencies, Metrolinx)
+| Field | Finding |
+|---|---|
+| What | Stop locations, routes, service frequency |
+| Licence | Per agency; most publish openly for reuse **[UNVERIFIED per agency]** |
+| Class | `open` per agency, confirmed one at a time |
 
 ### Bank of Canada — Valet API
 | Field | Finding |
@@ -145,19 +161,29 @@ contradict it (`/docs/architecture/ARCHITECTURE.md` §5).
 | Class | Per source; default `restricted` until the specific authority's terms are read |
 | Rule | Absence of mapping is `UNKNOWN`, never "no risk" |
 
-### OpenStreetMap / Overpass
+### MPAC — **not used in the free stack**
 | Field | Finding |
 |---|---|
-| Licence | ODbL — attribution, and share-alike on derived *databases* |
-| Class | `open` with obligations |
-| Note | `NEEDS COUNSEL` on whether our derived amenity metrics constitute a derived database |
+| Why not | Negotiated licence fee. Replaced by user-entered attributes plus open-data cross-checks (ADR 0002 §4) |
+| Class | `licensed` if ever adopted |
 
-### Listing portals (REALTOR.ca, HouseSigma, Wahi, Zolo, brokerage sites)
+### Listing portals (REALTOR.ca, HouseSigma, Wahi, Zolo, Zoocasa, Redfin.ca, brokerage sites)
 | Field | Finding |
 |---|---|
 | Terms | Prohibit commercial use, screen scraping and database scraping |
 | **Class** | **`prohibited`** |
-| Policy | We do not scrape them. Ever. Not for "enrichment", not for a demo, not for evaluation. A user may upload a document they already have; we do not fetch on their behalf from a source that forbids it |
+| Precedent | *Century 21 Canada LP v. Rogers Communications Inc.*, 2011 BCSC 1196: browse-wrap terms held enforceable, copyright infringement found in copied listings and photographs, fair dealing rejected, injunction and damages granted **[PRIMARY — CanLII]** |
+| Enforcement environment | CREA's DDF Rules oblige every participant to monitor for scraping and report it (§5(k)–(l)) |
+| Policy | We do not collect from them. Not for enrichment, not for a demo, not for evaluation. A user may upload or paste a document they already have, and a user may read a page and type in a number — neither is us fetching from a source that forbids it |
+
+### User-supplied content (listing text, PDFs, screenshots, comparable sales)
+| Field | Finding |
+|---|---|
+| What | Everything the user chooses to give us about a property, including sold comparables their realtor sent them |
+| Licence | The user supplies it for the purpose of their own analysis |
+| Class | `open` to us for that user's analysis; **not** redistributable, not poolable across users without separate consent |
+| Provenance | `user_asserted`, `user_asserted_extracted`, or `user_supplied_comparable`; confidence capped per `SCORING_MODEL.md` §8 |
+| Note | Aggregating user-supplied MLS-derived figures into a shared corpus would recreate the licensing problem by another route. Per-user scope is a **hard** boundary, enforced in the repository layer |
 
 ---
 
@@ -169,19 +195,28 @@ contradict it (`/docs/architecture/ARCHITECTURE.md` §5).
    wherever the derived value renders.
 4. **Retention is scheduled, not remembered.** `expires_at` on retention-limited facts; a sweeper
    deletes them; deletion is tested.
-5. **Scraping is not an engineering decision.** It is prohibited by policy. If a data need can
-   only be met by scraping, the answer to the user is "Data unavailable".
-6. **Re-review annually,** and whenever a provider announces terms changes.
+5. **Automated collection follows the licence, not the technical possibility.** Permitted:
+   bulk downloads and API access to open-licensed government and OSM data, plus polite,
+   `robots.txt`-respecting fetches of public government pages with no prohibiting terms —
+   cached once, not per user. Prohibited: any automated collection from MLS-derived sites
+   (ADR 0002 §2). If a data need can only be met by the prohibited kind, the answer to the user
+   is "Data unavailable" or "tell us what you know".
+6. **User-supplied data stays with that user.** Never pooled into a shared corpus without
+   separate, explicit consent — pooling MLS-derived figures across users would recreate the
+   licensing problem by another route.
+7. **Re-review annually,** and whenever a provider announces terms changes.
 
 ---
 
 ## 4. Open licensing questions
 
-| # | Question | Blocks |
-|---|---|---|
-| 1 | MPAC commercial terms and pricing for a consumer analysis product | Property attributes at scale |
-| 2 | Would a board permit a VOW-derived comparable analysis in a non-brokerage consumer product? | The comparable engine, the moat |
-| 3 | Walk Score written position on paid consumer products | Location Score composition |
-| 4 | Local Logic caching and redistribution terms | Whether scores can be stored per analysis |
-| 5 | Does ODbL share-alike reach our derived metrics? | Using OSM as the amenity fallback |
-| 6 | Which geocoder permits durable coordinate storage at acceptable cost? | Schema design for `locations` |
+| # | Question | Blocks | Status |
+|---|---|---|---|
+| 1 | Does ODbL share-alike reach our stored derived metrics (walk score, amenity counts)? | Nothing — mitigation is to publish the derived table | `NEEDS COUNSEL`, low urgency |
+| 2 | Per-agency GTFS licences for the pilot region | The transit metric | Confirm one at a time |
+| 3 | Conservation authority terms for the pilot region's flood layers | The flood risk flag | Confirm before integration |
+| 4 | Municipal open-data licences outside Toronto | Risk flags beyond the pilot city | Per municipality |
+
+Deferred, and only relevant if the owner later reverses the zero-cost decision: MPAC commercial
+terms; whether a board would permit VOW-derived comparable analysis in a non-brokerage product;
+Walk Score's written position on paid products; Local Logic caching rights.

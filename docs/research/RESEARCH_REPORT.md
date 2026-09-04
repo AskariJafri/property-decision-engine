@@ -393,13 +393,18 @@ how missing data reduces confidence and redistributes weight instead of silently
 
 1. **Pilot geography.** Toronto proper (best open data, worst affordability, new luxury MLTT) or
    a 905 municipality? This decides the first flood, zoning and development integrations.
-2. **Budget for licensed data.** MPAC plus Local Logic together set the floor for a credible
-   Value and Location score. Is there budget in Phase 1, or is the MVP strictly free-tier?
+   **Still open.**
+2. ~~**Budget for licensed data.**~~ **Answered 2026-09-04: no licence fees.** See
+   [ADR 0002](../decisions/0002-zero-cost-data-strategy.md) — self-hosted OSM replaces Google,
+   Walk Score and Local Logic; user-supplied comparables replace board data; user-entered
+   attributes replace MPAC.
 3. **Business model.** Per-analysis fee, subscription, or free with a later brokerage/lender
    relationship? The answer changes both the FSRA analysis and the independence claim.
-4. **Brokerage strategy.** Long term, is the owner willing to hold or partner with a licensed
-   brokerage to obtain VOW sold data? That is the difference between a good tool and a moat.
+   **Still open.**
+4. **Brokerage strategy.** Deferred by ADR 0002, not closed: without it, the statistical/ML
+   valuation in V3 has no corpus to learn from. Worth revisiting once V1 has users.
 5. **Named legal review.** Who signs off on the mortgage-adjacent language before launch?
+   **Still open.**
 
 ---
 

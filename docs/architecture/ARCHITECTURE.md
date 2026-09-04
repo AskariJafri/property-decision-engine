@@ -142,6 +142,12 @@ A provider whose policy says `may_store_values=False` physically cannot get a du
 `data_provenance` row for that field; the repository refuses the write. Licensing is enforced by
 the code path, not by a developer remembering a page in a document.
 
+In the zero-cost stack (ADR 0002) most adapters point at **our own services** — Nominatim, OSRM
+and Overpass running on an Ontario OSM extract — so their policies are `open` with permanent
+storage and no rate limit. The mechanism stays regardless: it is what stops a future paid or
+restricted provider from being wired in casually, and it is what keeps `prohibited` sources
+un-integrable by construction rather than by discipline.
+
 ---
 
 ## 6. Data model (proposal)
@@ -159,7 +165,8 @@ Money in **integer cents**; never floats. Percentages as decimals with explicit 
 rather than a comment), `property_price_history`, `property_history`
 
 **Location**
-`locations` (place ID + our derived metrics only — see the Google constraint),
+`locations` (coordinates, matched OSM feature, our derived metrics — durable, because the
+self-hosted ODbL stack permits storage where Google would not; see ADR 0002 §1),
 `location_metrics` (metric, value, provider, retrieved_at, expires_at)
 
 **Analysis**
@@ -235,6 +242,15 @@ Provider abstraction from day one — the AI layer speaks to an interface, not t
 
 ## 10. Deployment
 
-Docker Compose for development (api, web, postgres). Alembic migrations gated in CI. Postgres
-managed in production. Secrets from the environment, never in the repo; `.env.example` carries
-names and shapes only.
+Docker Compose for development: `api`, `web`, `postgres`, plus the location stack — `nominatim`,
+`osrm` (or `valhalla`) and `overpass`, all built from a Geofabrik Ontario extract. The extract
+import is a one-off job of a few hours; a monthly refresh keeps it current. Developers who do
+not need location work can run without those three and let the adapters return `unavailable`,
+which is a state the product handles by design.
+
+Alembic migrations gated in CI. Postgres managed in production; the OSM services on one modest
+VM. Secrets from the environment, never in the repo; `.env.example` carries names and shapes
+only.
+
+**Cost profile:** $0 in data licence fees. The infrastructure is one app host, one database and
+one OSM box.

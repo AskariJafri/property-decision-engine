@@ -102,24 +102,32 @@ lender can confirm**. The two are never merged into one number.
 
 ## 4. Value (20%)
 
-**v1 (MVP, no sold comps).** Inputs: asking price, property attributes, municipal/market
-benchmarks (MLS HPI benchmark for the area, average price, days on market), price per square
-foot where sqft is known.
+**v1 (MVP).** Inputs: asking price, property attributes, municipal/market benchmarks (MLS HPI
+benchmark for the area, average price, days on market), price per square foot where sqft is
+known, **plus any comparable sales the user supplies** (ADR 0002 §3 — the user pastes what their
+realtor sent, or types in what they looked up themselves).
 
 ```
 fair_value_range = benchmark_value × attribute_adjustment × [1 − spread, 1 + spread]
 ```
 
-`spread` starts at **±12%** with market-only evidence and narrows as evidence improves (see §8).
-The score is a function of where the asking price sits in the range: at or below the low bound →
-high score; above the high bound → falling score, steeply past +10%.
+`spread` and confidence are both driven by how much comparable evidence exists:
 
-**Confidence in v1 is capped at 45%.** The UI must state, in words, that no sold comparables
-were available.
+| Evidence | Spread | Confidence cap | UI must say |
+|---|---|---|---|
+| Market benchmarks only | ±12% | 45% | "No comparable sales — add some to narrow this" |
+| 1–2 user-supplied comps | ±9% | 60% | how many comps, and how well they match |
+| 3–5 comps, mean similarity ≥ 0.80 | ±6% | 75% | as above |
+| 6+ comps, mean similarity ≥ 0.85 | ±4% | 85% | as above |
 
-**v2+ (with licensed comps).** Weighted comparable analysis (see §5), then statistical, then ML,
-per the roadmap. The interface — `(property, market_context) → FairValueRange + confidence +
-evidence[]` — is fixed now so the model behind it can be replaced without touching the score.
+This turns the one genuinely gated dataset into a **dial the user can turn**: five minutes of
+pasting produces a materially tighter range, and the UI says so rather than silently offering a
+vague answer. The score is a function of where the asking price sits in the resulting range: at
+or below the low bound → high score; above the high bound → falling, steeply past +10%.
+
+**v2+ .** Statistical, then ML valuation. The interface — `(property, market_context, comps[]) →
+FairValueRange + confidence + evidence[]` — is fixed now so the model behind it can be replaced
+without touching the score.
 
 Never emit a point value. "Estimated fair value $832,451" is a lie about precision even when the
 midpoint is right.
@@ -145,6 +153,16 @@ Each comparable stores similarity, distance, sale date, attributes, **and the re
 inclusion or exclusion in plain language**. A comparable below 70% similarity is excluded and
 the exclusion is shown, because "we ignored the cheap one across the tracks, here's why" is more
 trust-building than a silent filter.
+
+**Source of comparables in the MVP: the user.** The engine does not care where a comp came from
+— it needs an address, a sale date, a price and whatever attributes are known. User-supplied
+comps carry `user_supplied_comparable` provenance and a source-quality factor of 0.65 (§8), and
+each one is stored scoped to that user; they are never pooled into a shared corpus, because
+pooling MLS-derived figures across users recreates the licensing problem the design avoids.
+
+Missing attributes on a comp reduce its similarity confidence rather than excluding it: a user
+who knows only "sold $845k in June, same street, similar size" has still told us something worth
+using, and the engine says how much weight it gave that.
 
 ---
 
