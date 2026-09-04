@@ -30,9 +30,20 @@ from decimal import Decimal
 from enum import StrEnum
 from typing import Protocol
 
-from app.engines.scoring.contracts import Component
+from app.engines.scoring.contracts import CappedAdjustment, Component
 
 JUDGEMENT_SCHEMA_VERSION = "0.1.0"
+
+__all__ = [  # CappedAdjustment is re-exported: defined in the engine that consumes it
+    "CappedAdjustment",
+    "Evidence",
+    "Judgement",
+    "JudgementItem",
+    "JudgementType",
+    "LlmProvider",
+    "LlmUnavailableError",
+    "apply_judgement",
+]
 
 
 class JudgementType(StrEnum):
@@ -139,18 +150,6 @@ class Judgement:
     @property
     def target_component(self) -> Component | None:
         return TARGET_COMPONENT[self.judgement_type]
-
-
-@dataclass(frozen=True, slots=True)
-class CappedAdjustment:
-    """What a judgement was actually allowed to do to a subscore."""
-
-    component: Component
-    raw_adjustment: Decimal
-    applied_adjustment: Decimal
-    capped: bool
-    """True when the cap bound the result. Worth counting: a judgement that is
-    always capped is a judgement whose weights are calibrated wrong."""
 
 
 def apply_judgement(judgement: Judgement) -> CappedAdjustment | None:

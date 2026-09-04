@@ -52,6 +52,23 @@ MIN_MODIFIER = Decimal("0.5")
 MAX_MODIFIER = Decimal("2.0")
 
 
+@dataclass(frozen=True, slots=True)
+class CappedAdjustment:
+    """A bounded adjustment a judgement was allowed to make to a subscore.
+
+    Defined here rather than in ``app.ai`` because the scoring engine consumes it
+    and engines may not import the AI layer (ADR 0001 §5). The AI layer produces
+    values of this type; the engine only ever receives one.
+    """
+
+    component: Component
+    raw_adjustment: Decimal
+    applied_adjustment: Decimal
+    capped: bool
+    """True when the cap bound the result. Worth counting: a judgement that is
+    always capped is a judgement whose weights are calibrated wrong."""
+
+
 class Direction(StrEnum):
     POSITIVE = "positive"
     NEGATIVE = "negative"
