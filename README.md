@@ -8,8 +8,8 @@ requirements with a property's details, computes the money deterministically, sc
 surfaces the risks worth investigating, and explains the result — labelling every number as
 verified, calculated, estimated, assumed, AI-inferred, or unavailable.
 
-**Status: Phase C (database) complete.** Docs, contracts, scaffold and schema are in place;
-the engines are implemented in Phase D onward.
+**Status: Phase D (financial engine) complete.** The money is computed, traced and tested;
+scoring is Phase E.
 
 ```
 cd backend && python -m venv .venv && .venv/bin/pip install -e ".[dev]"
