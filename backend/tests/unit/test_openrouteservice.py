@@ -141,3 +141,55 @@ class TestLocationSubscore:
         result = location_subscore(commute_minutes=25, max_commute_minutes=None)
         assert result.available and result.score is not None
         assert result.score > Decimal("50")
+
+
+class TestErrorResponses:
+    """ORS says things with status codes. They need translating, not leaking."""
+
+    async def test_a_404_means_no_route_not_a_dead_service(self):
+        """ORS answers "no route between these points" with 404 and an error body.
+        Reporting that as unreachable is false, and the raw exception dragged an
+        MDN link into a sentence a buyer reads."""
+        payload = {"error": {"code": 2010, "message": "Could not find routable point"}}
+        async with transport(lambda r: httpx.Response(404, json=payload)) as client:
+            fact = await OpenRouteServiceProvider("k", client=client).commute(
+                from_lat=43.65, from_lon=-79.38, to_lat=43.90, to_lon=-78.85
+            )
+        reason = fact.provenance.unavailable_reason or ""
+        # Translated into the fix, not the raw message with coordinates in it.
+        assert "full street address" in reason
+        assert "could not be reached" not in reason
+        assert "mozilla" not in reason.lower()
+
+    async def test_other_semantic_errors_keep_the_services_own_words(self):
+        payload = {"error": {"code": 2004, "message": "Request exceeds maximum distance"}}
+        async with transport(lambda r: httpx.Response(413, json=payload)) as client:
+            fact = await OpenRouteServiceProvider("k", client=client).commute(
+                from_lat=1, from_lon=1, to_lat=50, to_lon=50
+            )
+        assert "exceeds maximum distance" in (fact.provenance.unavailable_reason or "")
+
+    async def test_a_rejected_key_says_so(self):
+        async with transport(lambda r: httpx.Response(403, json={})) as client:
+            fact = await OpenRouteServiceProvider("bad", client=client).commute(
+                from_lat=1, from_lon=1, to_lat=2, to_lon=2
+            )
+        assert "rejected the API key" in (fact.provenance.unavailable_reason or "")
+
+    async def test_the_daily_quota_says_when_it_returns(self):
+        async with transport(lambda r: httpx.Response(429, json={})) as client:
+            fact = await OpenRouteServiceProvider("k", client=client).commute(
+                from_lat=1, from_lon=1, to_lat=2, to_lon=2
+            )
+        reason = fact.provenance.unavailable_reason or ""
+        assert "free tier" in reason and "tomorrow" in reason
+
+    async def test_a_genuine_connection_failure_still_says_unreachable(self):
+        def boom(request: httpx.Request) -> httpx.Response:
+            raise httpx.ConnectError("refused", request=request)
+
+        async with transport(boom) as client:
+            fact = await OpenRouteServiceProvider("k", client=client).commute(
+                from_lat=1, from_lon=1, to_lat=2, to_lon=2
+            )
+        assert "could not be reached" in (fact.provenance.unavailable_reason or "")

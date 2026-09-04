@@ -89,9 +89,12 @@ class OpenRouteServiceProvider:
                 "/geocode/search",
                 {"api_key": self.api_key, "text": address, "boundary.country": "CA", "size": 1},
             )
+        except httpx.HTTPStatusError as exc:
+            return Fact.unavailable(self._explain(exc), source_key=self.policy.key)
         except httpx.HTTPError as exc:
             return Fact.unavailable(
-                f"The geocoder could not be reached: {exc}", source_key=self.policy.key
+                f"The geocoding service could not be reached: {exc.__class__.__name__}.",
+                source_key=self.policy.key,
             )
 
         features = body.get("features") or []
@@ -135,9 +138,15 @@ class OpenRouteServiceProvider:
                 # entirely the wrong place, which is the worst kind of wrong.
                 {"coordinates": [[from_lon, from_lat], [to_lon, to_lat]]},
             )
+        except httpx.HTTPStatusError as exc:
+            return Fact.unavailable(
+                f"No commute could be calculated: {self._explain(exc)}",
+                source_key=self.policy.key,
+            )
         except httpx.HTTPError as exc:
             return Fact.unavailable(
-                f"The routing service could not be reached: {exc}", source_key=self.policy.key
+                f"The routing service could not be reached: {exc.__class__.__name__}.",
+                source_key=self.policy.key,
             )
 
         routes = body.get("routes") or []
@@ -178,6 +187,41 @@ class OpenRouteServiceProvider:
         finally:
             if self._client is None:
                 await client.aclose()
+
+    @staticmethod
+    def _explain(exc: httpx.HTTPStatusError) -> str:
+        """Turn an ORS error response into something a buyer can act on.
+
+        ORS answers "no route between these points" with HTTP 404 and an error body,
+        not with a 200 and an empty list. Treating that as a transport failure told
+        the user the service could not be reached — which was false, and came with a
+        raw MDN link attached.
+        """
+        try:
+            error = exc.response.json().get("error", {})
+            message = error.get("message") if isinstance(error, dict) else str(error)
+        except ValueError:
+            message = None
+        if exc.response.status_code in (404, 413) and message:
+            if "routable point" in str(message).lower():
+                # Geocoding a bare city name lands on a centroid that may be
+                # nowhere near a road. The fix is a street address, so say that
+                # rather than quoting coordinates at a home buyer.
+                return (
+                    "One of the addresses did not resolve to a point on the road "
+                    "network. Try a full street address rather than just a city."
+                )
+            return str(message)
+        if exc.response.status_code in (401, 403):
+            return "OpenRouteService rejected the API key. Check PDE_ORS_API_KEY."
+        if exc.response.status_code == 429:
+            return (
+                "The OpenRouteService free tier is out of requests for today "
+                "(2,500 per day). Commute will work again tomorrow."
+            )
+        return f"OpenRouteService returned {exc.response.status_code}" + (
+            f": {message}" if message else "."
+        )
 
     async def _post(self, path: str, body: dict[str, Any]) -> dict[str, Any]:
         client = self._client or httpx.AsyncClient(timeout=25)

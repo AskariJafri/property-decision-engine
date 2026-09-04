@@ -190,6 +190,8 @@ class AnalysisService:
                     else preferences.commute_minutes
                 ),
                 max_commute_minutes=preferences.max_commute_minutes,
+                # Location narrates the commute when it measured one.
+                emit_commute_factor=not (location and location.commute_minutes),
             ),
             _location(location, preferences.max_commute_minutes),
             property_quality_subscore(

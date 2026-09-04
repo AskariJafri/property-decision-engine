@@ -196,6 +196,7 @@ def personal_fit_subscore(
     requires_parking: bool | None,
     commute_minutes: int | None,
     max_commute_minutes: int | None,
+    emit_commute_factor: bool = True,
 ) -> Subscore:
     """Requirement-by-requirement matching, with hard failures capped at 40.
 
@@ -254,15 +255,18 @@ def personal_fit_subscore(
                 ratio > Decimal("1.3"),
             )
         )
-        factors.append(
-            _factor(
-                Component.PERSONAL_FIT,
-                ratio <= 1,
-                "12",
-                f"A {commute_minutes} minute commute against your {max_commute_minutes} minute "
-                "maximum.",
+        # The commute still counts toward the score; the sentence is suppressed when
+        # Location is already saying it, so the user does not read it twice.
+        if emit_commute_factor:
+            factors.append(
+                _factor(
+                    Component.PERSONAL_FIT,
+                    ratio <= 1,
+                    "12",
+                    f"A {commute_minutes} minute commute against your "
+                    f"{max_commute_minutes} minute maximum.",
+                )
             )
-        )
 
     if not checks:
         return unavailable_fit()
