@@ -8,8 +8,8 @@ requirements with a property's details, computes the money deterministically, sc
 surfaces the risks worth investigating, and explains the result — labelling every number as
 verified, calculated, estimated, assumed, AI-inferred, or unavailable.
 
-**Status: Phase B (architecture) complete.** Docs, contracts and scaffold are in place; the
-engines are implemented in Phase D onward.
+**Status: Phase C (database) complete.** Docs, contracts, scaffold and schema are in place;
+the engines are implemented in Phase D onward.
 
 ```
 cd backend && python -m venv .venv && .venv/bin/pip install -e ".[dev]"
@@ -34,6 +34,7 @@ ruff check . && mypy app && pytest -q
 | [`docs/decisions/0001-initial-architecture.md`](docs/decisions/0001-initial-architecture.md) | The eight decisions that shape everything after |
 | [`docs/decisions/0002-zero-cost-data-strategy.md`](docs/decisions/0002-zero-cost-data-strategy.md) | The $0 stack, and exactly what may and may not be collected automatically |
 | [`docs/decisions/0003-toronto-pilot.md`](docs/decisions/0003-toronto-pilot.md) | Toronto as pilot city, and the sources it unlocks |
+| [`docs/decisions/0004-ai-judgements.md`](docs/decisions/0004-ai-judgements.md) | How AI improves the decision without touching the arithmetic |
 | [`docs/ROADMAP.md`](docs/ROADMAP.md) | Phases A–L, the first four weeks, and V1–V10 |
 
 ## Principles

@@ -11,7 +11,7 @@ Each phase ends with: tests run, code reviewed, errors fixed, documentation upda
 |---|---|---|
 | **A ✅** | Research | The document set; pilot city and data budget answered (ADR 0002, 0003) |
 | **B ✅** | Architecture | `DATABASE.md`, `API.md`, engine contracts, `ProviderPolicy` registry, repo scaffold; CI green — ruff, ruff format, mypy strict, 41 tests |
-| **C** | Database | Alembic migrations for identity, property, provenance, analysis; migrations apply cleanly against Postgres in CI |
+| **C ✅** | Database | 29 tables across identity, property, provenance, analysis and the AI judgement channel; migration applies, round-trips, and its constraints are asserted against real Postgres in CI |
 | **D** | Financial engine | Mortgage, insurance premium, LTT/MLTT/NRST, ownership cost, qualification estimate, stress cases — all pure, all fixture-tested, rule registry seeded and dated |
 | **E** | Scoring engine | Subscores, weights, user modifiers, missing-data handling, confidence; reproducibility test passes across runs |
 | **F** | Backend API | Profile, property, analyze, scenarios, compare; OpenAPI published; auth, rate limits, redacted logging |

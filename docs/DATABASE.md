@@ -238,6 +238,18 @@ Every financial figure's working, stored so the UI can show it and an auditor ca
 ### `mortgage_scenarios`, `financial_scenarios`
 Scenario runs against an analysis: `changed_assumptions` jsonb plus the recomputed outputs.
 
+### `ai_judgements`, `analysis_judgements`
+The ADR 0004 channel. A judgement stores the validated `output`, the quoted
+`evidence`, `confidence`, the `influence_cap` that applied, plus `model_id`,
+`prompt_hash`, `sampling` and `judgement_version` — everything needed to replay it
+rather than re-ask for it. `analysis_judgements` records which pinned judgements an
+analysis consumed and what each one actually moved, with a `capped` flag (a
+judgement that is always capped is calibrated wrong, and that is worth counting).
+
+`risk_flags.ai_judgement_id` carries a CHECK: a flag sourced from a judgement must
+have `status = 'potential'`. A model may raise a suspicion; only a data source can
+confirm one.
+
 ### `ai_reports`
 `analysis_id`, `model`, `prompt_hash`, `output` jsonb (summary, pros, cons, explanation,
 questions, what_would_change), `validated_at`, `numeric_guard_passed` boolean, `created_at`.

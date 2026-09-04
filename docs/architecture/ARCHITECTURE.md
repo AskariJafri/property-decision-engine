@@ -213,7 +213,11 @@ breakdown, location, risks, comparables, scenarios, saved, compare, settings.
 
 ## 8. AI layer
 
-Contract: **structured facts in, prose out.** The model receives a compact JSON bundle of
+The layer runs at two points (ADR 0004). **Before scoring** it produces typed,
+capped, pinned *judgements* that the deterministic engines consume as ordinary
+inputs at `AI_INFERRED` quality. **After scoring** it narrates, as below.
+
+Contract for the narration pass: **structured facts in, prose out.** The model receives a compact JSON bundle of
 already-computed values plus a list of `unavailable` fields, and returns a validated JSON
 document (summary, pros, cons, explanation, questions, what-would-change-this). Validation
 rejects any numeric token not present in the input bundle, so a hallucinated figure fails
@@ -223,7 +227,10 @@ Cost control: nothing calls a model unless a deterministic stage has finished an
 changed. Explanations are cached against the analysis hash. Extraction is the only pre-analysis
 model call and it is user-initiated.
 
-Provider abstraction from day one — the AI layer speaks to an interface, not to a vendor SDK.
+Provider abstraction from day one — the AI layer speaks to an OpenAI-compatible
+interface, not a vendor SDK. Local Ollama now; free hosted tiers later differ by a
+base URL and a model name. Sampling is pinned (temperature 0, fixed seed, exact
+model tag) and the tag is stored with every judgement.
 
 ---
 

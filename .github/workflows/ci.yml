@@ -40,8 +40,66 @@ jobs:
       - name: Types (mypy)
         run: mypy app
 
-      # The suite is pure: engines take value objects and return value objects, so
-      # nothing here needs Postgres or a network. That is the property
-      # tests/unit/test_layering.py exists to keep true.
+      # The unit suite is pure: engines take value objects and return value objects,
+      # so nothing here needs Postgres or a network. That is the property
+      # tests/unit/test_layering.py exists to keep true. The schema-constraint tests
+      # skip without PDE_TEST_DATABASE_URL and run in the migrations job below.
       - name: Test (pytest)
         run: pytest -q
+
+  migrations:
+    name: Migrations apply, round-trip, and hold their constraints
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+
+    services:
+      postgres:
+        image: postgis/postgis:16-3.4
+        env:
+          POSTGRES_USER: pde
+          POSTGRES_PASSWORD: pde
+          POSTGRES_DB: pde
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U pde"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      PDE_DATABASE_URL: postgresql+asyncpg://pde:pde@localhost:5432/pde
+      PDE_TEST_DATABASE_URL: postgresql://pde:pde@localhost:5432/pde
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -e ".[dev]"
+
+      - name: Migrate to head
+        run: alembic upgrade head
+
+      # A migration that cannot be undone is a migration nobody dares run. The
+      # round trip also catches the classic Postgres trap where dropping a table
+      # leaves its ENUM behind and the next upgrade fails on "type already exists".
+      - name: Downgrade and re-upgrade
+        run: |
+          alembic downgrade base
+          alembic upgrade head
+
+      # Models and migrations must agree. A drift here means someone edited a model
+      # without generating the migration, and the next deploy would be a surprise.
+      - name: No pending schema drift
+        run: alembic check
+
+      - name: Schema constraints hold (pytest)
+        run: pytest tests/integration -q

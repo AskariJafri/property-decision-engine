@@ -198,6 +198,34 @@ masquerading as "this house floods".
 
 ---
 
+## 6.5 AI judgements (ADR 0004)
+
+A model may contribute to a subscore, and only through a capped, evidence-bearing,
+**pinned** judgement. It never adjusts a finished score.
+
+| Judgement | Subscore | Cap | Effect |
+|---|---|---|---|
+| `condition_signal` | Property quality | ±8 | Renovation recency, deferred maintenance, "as-is" framing |
+| `listing_red_flags` | Risk | ±6 | Adds `POTENTIAL` flags only; never `CONFIRMED` |
+| `omission_signals` | — | 0 | Generates questions; lowers confidence |
+| `preference_interpretation` | Personal fit | 0 until confirmed | Becomes `USER_ASSERTED` on confirmation, then scores normally |
+| `decision_review` | — | 0 | Surfaces an internal inconsistency for the user |
+
+Three properties make this safe enough to leave in the scoring path:
+
+1. **The cap is absolute.** `apply_judgement()` clamps after weighting, so no
+   distribution of item weights and no claimed confidence can exceed the bound.
+   A completely wrong judgement costs a couple of points on the Buy Score.
+2. **Judgements are pinned, not regenerated.** The stored output, model id, prompt
+   hash and sampling parameters are what the score is computed from, so
+   reproducibility survives a nondeterministic model. Re-asking creates a new
+   analysis, never a different answer to the old one.
+3. **Contributions are labelled.** An AI-derived factor renders with its source
+   class visible, at `AI_INFERRED` quality (0.5) in the confidence term of §8.
+
+Unavailable model, failed validation, or missing evidence ⇒ the judgement is
+unavailable, its contribution is zero, and §7 applies as for any other missing input.
+
 ## 7. Missing data
 
 Each subscore declares its minimum viable input set. Behaviour:
