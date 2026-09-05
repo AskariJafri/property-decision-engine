@@ -20,11 +20,14 @@ full working. Phases A–E are complete; F–K are partial and L has not started
 Deployed free on Vercel. Commute times are live. Amenity counts report themselves unavailable,
 because they need the self-hosted OpenStreetMap stack.
 
-**The analysis carries no AI.** Not because of the deployment — because nothing is wired into
-the response yet, here or locally. The provider, the judgement runtime, the influence caps and
-the numeric guard are built and tested, but no endpoint calls them (ROADMAP phase J). Every
-number you see is deterministic, which is the intended default: AI was only ever allowed in as
-a bounded input, never as the calculator.
+**Plain-language explanations are off on the deployment.** They are wired in and rendered, but
+they need a model the server can actually reach, and the deployed API has none — set
+`PDE_LLM_EXPLANATIONS_ENABLED=true` with Ollama running to see them locally.
+
+The explanation never contributes a number. It is handed a finished analysis, and the numeric
+guard discards the whole thing if a figure appears that was not supplied — so it either arrives
+verified or does not arrive at all. Every figure stays deterministic whether the model is on,
+off, or lying.
 
 Nothing is saved — there are no accounts yet.
 

@@ -7,11 +7,15 @@ source URL and the date it took effect.
 
 from __future__ import annotations
 
+import logging
 from datetime import UTC, date, datetime
 from typing import Any
 
 from fastapi import APIRouter, File, HTTPException, Query, UploadFile
 
+from app.ai.contracts import LlmUnavailableError
+from app.ai.explainer import NumericGuardError, explain
+from app.ai.provider import OpenAICompatibleProvider
 from app.core.config import get_settings
 from app.engines.financial.rules_seed import default_rule_set
 from app.engines.scoring.contracts import SCORING_MODEL_VERSION
@@ -23,6 +27,7 @@ from app.providers.osm import NominatimGeocoder, OsrmRouter
 from app.schemas.analysis import (
     AnalyzeRequest,
     AnalyzeResponse,
+    ExplanationOut,
     ParseListingRequest,
     ParseListingResponse,
 )
@@ -59,13 +64,14 @@ async def health() -> dict[str, Any]:
             "overpass": bool(settings.overpass_url),
         },
         # Reported separately from the providers above, and deliberately not as
-        # a "configured" flag. llm_base_url has a non-empty default, so
-        # bool(...) on it is true on every deployment that has never seen a
-        # model — it read as "AI is on" while no endpoint called a model at all.
-        # The analyze path is entirely deterministic today: the provider,
-        # judgement runtime and caps exist and are tested, but nothing is wired
-        # into the response (ROADMAP phase J).
-        "ai_in_analysis": False,
+        # a "configured" flag. llm_base_url has a non-empty default, so bool(...)
+        # on it was true on every deployment that had never seen a model, and
+        # read as "AI is on" while nothing called a model at all.
+        #
+        # This is the explicit switch instead. Still not a promise of
+        # reachability: with it on and the model down, the analysis renders in
+        # full and says why the prose is missing. The figures never depend on it.
+        "ai_explanations_enabled": settings.llm_explanations_enabled,
     }
 
 
@@ -79,9 +85,57 @@ async def analyze(request: AnalyzeRequest) -> AnalyzeResponse:
     """
     location = await _resolve_location(request)
     try:
-        return SERVICE.analyze(request, as_of=datetime.now(UTC).date(), location=location)
+        analysis = SERVICE.analyze(request, as_of=datetime.now(UTC).date(), location=location)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    analysis.explanation, analysis.explanation_unavailable_reason = await _explain(analysis)
+    return analysis
+
+
+async def _explain(
+    analysis: AnalyzeResponse,
+) -> tuple[ExplanationOut | None, str | None]:
+    """Narrate a finished analysis, or say why there is no narration.
+
+    Deliberately the last step, over a completed result. The model sees numbers
+    that already exist and cannot influence them: it is handed the analysis, not
+    consulted during it (ADR 0004). Every failure returns a reason instead of
+    raising, because prose is the least important thing on the page and must
+    never be able to take the figures down with it.
+    """
+    settings = get_settings()
+    if not settings.llm_explanations_enabled:
+        return None, (
+            "Explanations are turned off for this deployment. The analysis above is "
+            "computed deterministically and is unaffected."
+        )
+
+    provider = OpenAICompatibleProvider(settings)
+    try:
+        explanation = await explain(analysis.model_dump(mode="json"), provider)
+    except NumericGuardError as exc:
+        # The interesting failure, and the reason the guard exists: the model
+        # produced a figure nobody gave it. Discarded whole rather than repaired.
+        return None, str(exc)
+    except LlmUnavailableError as exc:
+        return None, f"No explanation was produced: {exc}"
+    except Exception as exc:  # prose must never break an analysis
+        logging.getLogger(__name__).warning("Explanation failed unexpectedly: %s", exc)
+        return None, "No explanation was produced: the model failed unexpectedly."
+
+    return (
+        ExplanationOut(
+            summary=explanation.summary,
+            pros=list(explanation.pros),
+            cons=list(explanation.cons),
+            questions=list(explanation.questions),
+            what_would_change_this=list(explanation.what_would_change_this),
+            model_id=explanation.model_id,
+            numeric_guard_passed=explanation.numeric_guard_passed,
+        ),
+        None,
+    )
 
 
 async def _resolve_location(request: AnalyzeRequest) -> LocationFacts:

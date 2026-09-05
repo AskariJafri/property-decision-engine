@@ -23,8 +23,9 @@ Both are Vercel Hobby projects built from this one repository, differing only in
 Directory. Commute times are live against OpenRouteService; amenity counts report
 themselves unavailable, as the table below says they will.
 
-The analysis contains no AI on either deployment. That is a wiring gap, not a hosting
-one — see the table below and ROADMAP phase J.
+Explanations are wired in but switched off on both deployments: Vercel functions cannot
+reach an Ollama on your machine, and no hosted model is configured. The figures never
+depend on one — see "Turning explanations on" below.
 
 ---
 
@@ -36,7 +37,7 @@ one — see the table below and ROADMAP phase J.
 | Listing paste and PDF upload | works | works |
 | Commute / Location | works with an ORS key | works, self-hosted |
 | Amenity counts | unavailable, stated | needs Overpass |
-| AI explanations | not wired in | not wired in (ROADMAP J) |
+| AI explanations | needs a reachable hosted model | works with Ollama |
 | Saved analyses | not built yet | not built yet |
 
 Every absent piece reports itself rather than failing, so a free deployment is a
@@ -140,6 +141,34 @@ now `15.5.25`, the current 15.x backport line.
 Worth knowing because the same block will fire again the next time an advisory
 lands and the pin has drifted behind it. A build that compiles is not evidence
 that the version is deployable.
+
+### Turning explanations on
+
+Three variables, and the flag is the one that matters:
+
+```
+PDE_LLM_EXPLANATIONS_ENABLED = true
+PDE_LLM_BASE_URL             = https://<an OpenAI-compatible endpoint>/v1
+PDE_LLM_MODEL                = <the exact tag, never an alias>
+PDE_LLM_API_KEY              = <the key, if the endpoint wants one>
+```
+
+**Do not turn the flag on without a reachable model.** The default base URL is
+`http://localhost:11434/v1`, and on a serverless host localhost is the function's
+own container: the call does not fail fast, it waits. A short connect timeout
+(`PDE_LLM_CONNECT_TIMEOUT_SECONDS`, 3s) bounds the damage, but paying it on every
+request for prose that can never arrive is waste.
+
+**Blanking `PDE_LLM_BASE_URL` does not turn the model off.** Blank environment
+variables are treated as unset so the default applies — the fix for a crash where
+an empty `PDE_LLM_SEED` took the whole app down at import. The consequence here is
+that emptying the URL restores the localhost default rather than clearing it. The
+flag is the switch; there is no other one.
+
+The model is handed a finished analysis and can move nothing in it. If it is down,
+slow, malformed or inventing figures, the analysis renders in full and says why the
+prose is missing. That is asserted in `tests/test_explanation_wiring.py`, which
+checks a complete set of figures alongside every failure mode.
 
 ### The licence caveat
 

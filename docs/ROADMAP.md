@@ -18,9 +18,9 @@ Each phase ends with: tests run, code reviewed, errors fixed, documentation upda
 | **G ◑** | Frontend | Next.js app: analysis form, score, money, factors, breakdown, the three data states, and the working. **Not done:** onboarding flow, dashboard, saved properties, comparison |
 | **H ◑** | Property ingestion | Extraction, validation, source anchoring, confirm-before-trust. **Not done:** PDF and image decoding, the API endpoints |
 | **I ◑** | Location intelligence | Nominatim, OSRM, Overpass, TRCA and Toronto adapters with degradation. **Not done:** wiring into the analysis (needs the OSM box), the scheduled Toronto import |
-| **J ◑** | AI explanation | OpenAI-compatible provider, judgement runtime with caps, the numeric guard. **Not done:** prompt tuning against a live model, wiring into the response |
-| **K ◑** | Testing | 236 backend tests, 3 Playwright E2E against real servers, migration constraints against real Postgres. **Not done:** calibration (`SCORING_MODEL.md` §9) |
-| **L ✗** | Deployment | CI covers lint, types, tests, migrations, build and E2E. **Not done:** hosting, managed Postgres, secrets, observability |
+| **J ◑** | AI explanation | OpenAI-compatible provider with bearer auth, judgement runtime with caps, the numeric guard, and the explanation wired into `/properties/analyze` and rendered behind an AI-inferred label. Off unless `PDE_LLM_EXPLANATIONS_ENABLED` is set. **Not done:** prompt tuning against a live model, a hosted model on the deployment, persisting judgements |
+| **K ◑** | Testing | 305 backend tests, 4 Playwright E2E against real servers, migration constraints against real Postgres. **Not done:** calibration (`SCORING_MODEL.md` §9) |
+| **L ◑** | Deployment | Both halves live on Vercel free tiers, CI covers lint, types, tests, migrations, build and E2E. **Not done:** managed Postgres, observability, a hosted model |
 
 ---
 

@@ -181,6 +181,73 @@ export function Factors({ result }: { result: AnalyzeResponse }) {
   );
 }
 
+/**
+ * The AI narration, kept visibly apart from everything above it.
+ *
+ * The whole product rests on a reader being able to tell a computed figure from
+ * an inferred sentence, so this never adopts the styling of the analysis: it is
+ * boxed, labelled with the model that wrote it, and stated to have contributed no
+ * numbers. When it is absent it says why, because silence here would leave a
+ * reader unsure whether an explanation was even attempted.
+ */
+export function Explanation({ result }: { result: AnalyzeResponse }) {
+  const { explanation, explanation_unavailable_reason: reason } = result;
+
+  if (!explanation) {
+    if (!reason) return null;
+    return (
+      <section className="border border-line rounded-lg p-4">
+        <h2 className="text-sm uppercase tracking-wide text-muted mb-2">In plain language</h2>
+        <p className="text-sm text-muted max-w-prose">{reason}</p>
+      </section>
+    );
+  }
+
+  const lists: [string, string[]][] = [
+    ["What works", explanation.pros],
+    ["What does not", explanation.cons],
+    ["Ask the realtor", explanation.questions],
+    ["What would change this", explanation.what_would_change_this],
+  ];
+
+  return (
+    <section className="border border-line rounded-lg p-4">
+      <div className="flex flex-wrap items-baseline gap-2 mb-2">
+        <h2 className="text-sm uppercase tracking-wide text-muted">In plain language</h2>
+        <span className="text-xs uppercase tracking-wide text-caution border border-caution/40 rounded px-1.5 py-0.5">
+          AI-inferred
+        </span>
+      </div>
+
+      <p className="text-sm max-w-prose">{explanation.summary}</p>
+
+      <div className="grid gap-6 md:grid-cols-2 mt-4">
+        {lists
+          .filter(([, items]) => items.length > 0)
+          .map(([heading, items]) => (
+            <div key={heading}>
+              <h3 className="text-xs uppercase tracking-wide text-muted mb-1">{heading}</h3>
+              <ul className="space-y-1">
+                {items.map((item, index) => (
+                  <li key={index} className="text-sm max-w-prose">
+                    {item}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+      </div>
+
+      {/* Written next to the prose rather than in a footnote: it is the reason
+          this section is safe to read at all. */}
+      <p className="text-xs text-muted mt-4 max-w-prose">
+        Written by {explanation.model_id} from the figures above. It contributed no numbers, and
+        every figure it mentions was checked against the analysis before this was shown.
+      </p>
+    </section>
+  );
+}
+
 export function NotChecked({ result }: { result: AnalyzeResponse }) {
   if (result.unavailable.length === 0) return null;
   return (

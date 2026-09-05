@@ -57,15 +57,30 @@ class OpenAICompatibleProvider:
             "response_format": {"type": "json_object", "schema": schema},
         }
 
-        client = self._client or httpx.AsyncClient(timeout=self._settings.llm_timeout_seconds)
+        # A bearer token when one is set, nothing when it is not: Ollama wants no
+        # Authorization header, and every hosted tier requires one.
+        headers = (
+            {"Authorization": f"Bearer {self._settings.llm_api_key}"}
+            if self._settings.llm_api_key
+            else {}
+        )
+
+        client = self._client or httpx.AsyncClient(
+            timeout=httpx.Timeout(
+                self._settings.llm_timeout_seconds,
+                connect=self._settings.llm_connect_timeout_seconds,
+            )
+        )
         try:
             response = await client.post(
-                f"{self._settings.llm_base_url.rstrip('/')}/chat/completions", json=payload
+                f"{self._settings.llm_base_url.rstrip('/')}/chat/completions",
+                json=payload,
+                headers=headers,
             )
             response.raise_for_status()
             body = response.json()
         except httpx.HTTPError as exc:
-            raise LlmUnavailableError(f"The local model could not be reached: {exc}") from exc
+            raise LlmUnavailableError(f"The model could not be reached: {exc}") from exc
         finally:
             if self._client is None:
                 await client.aclose()

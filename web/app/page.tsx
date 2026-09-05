@@ -10,7 +10,15 @@
 
 import { useState } from "react";
 
-import { Factors, Money, NotChecked, BuyScore, ScoreBreakdown, Working } from "@/components/Analysis";
+import {
+  Factors,
+  Money,
+  NotChecked,
+  BuyScore,
+  Explanation,
+  ScoreBreakdown,
+  Working,
+} from "@/components/Analysis";
 import {
   ComparablesInput,
   EMPTY_ROW,
@@ -364,6 +372,7 @@ export default function Home() {
           <BuyScore result={result} />
           <Money result={result} />
           <Factors result={result} />
+          <Explanation result={result} />
           <ScoreBreakdown scores={result.scores} />
           <NotChecked result={result} />
           <Working result={result} />

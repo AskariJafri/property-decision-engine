@@ -194,6 +194,25 @@ class FairValueOut(BaseModel):
     note: str
 
 
+class ExplanationOut(BaseModel):
+    """Prose over a finished analysis. Never a source of numbers (ADR 0004).
+
+    Every figure here was already computed deterministically and handed to the
+    model; the numeric guard rejected the whole explanation if it produced one
+    that was not. ``source`` is ``ai_inferred`` so the UI can label it as such,
+    because the one thing a reader must not do is mistake this for the analysis.
+    """
+
+    summary: str
+    pros: list[str]
+    cons: list[str]
+    questions: list[str]
+    what_would_change_this: list[str]
+    model_id: str
+    numeric_guard_passed: bool
+    source: str = "ai_inferred"
+
+
 class AnalyzeResponse(BaseModel):
     """The analysis payload. ``buy_score`` is nullable on purpose."""
 
@@ -213,6 +232,14 @@ class AnalyzeResponse(BaseModel):
     traces: list[TraceOut]
     assumptions: list[AssumptionOut]
     unavailable: list[dict[str, str]]
+
+    # Both nullable, and exactly one is populated. Prose that failed to arrive
+    # says why it failed, in keeping with the rule that a missing thing is named
+    # rather than passed over in silence — a blank space where an explanation
+    # should be tells the reader nothing about whether one was even attempted.
+    explanation: ExplanationOut | None = None
+    explanation_unavailable_reason: str | None = None
+
     disclaimer: str = (
         "This analysis is for informational purposes and is not financial, mortgage, legal, "
         "tax, insurance, or home-inspection advice."

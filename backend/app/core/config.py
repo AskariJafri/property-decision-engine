@@ -43,10 +43,28 @@ class Settings(BaseSettings):
     """The exact tag. An alias like "llama3" would silently change under us and
     break the pinning that makes judgements replayable."""
 
+    llm_api_key: str = ""
+    """Sent as a bearer token when set. Ollama needs none; every hosted tier does."""
+
     llm_temperature: float = 0.0
     llm_seed: int = 7
     llm_timeout_seconds: float = 90.0
     llm_max_tokens: int = 1024
+
+    # Off unless asked for, and the default base URL is why. It points at
+    # localhost, which on a serverless host is the function's own container: a
+    # request there does not fail fast, it hangs until the timeout and takes the
+    # whole analysis down with it. An explicit flag means a deployment cannot
+    # start paying that cost by accident, and it keeps "a model is configured"
+    # from being mistaken for "explanations are on" the way the old health flag
+    # was. Turn it on where a model is genuinely reachable.
+    llm_explanations_enabled: bool = False
+
+    # Deliberately short, and separate from llm_timeout_seconds. Generation can
+    # reasonably take a minute; discovering that nothing is listening should take
+    # a moment. Without this split, a wrong base URL costs every request the full
+    # generation timeout before degrading.
+    llm_connect_timeout_seconds: float = 3.0
 
     # Pilot jurisdiction (ADR 0003). A setting rather than a constant because the
     # second city is a configuration change, not a rewrite.

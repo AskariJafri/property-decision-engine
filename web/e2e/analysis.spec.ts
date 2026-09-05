@@ -36,6 +36,19 @@ test.describe("analysis", () => {
     await expect(page.getByText(/\$[\d,]+ – \$[\d,]+/)).toBeVisible();
   });
 
+  test("an absent explanation says why, rather than leaving a gap", async ({ page }) => {
+    // Explanations are off unless a deployment turns them on, and the section
+    // still has to appear: a blank space would leave a reader unable to tell
+    // whether prose was attempted, failed, or was never part of the product.
+    await page.goto("/");
+    await page.getByRole("button", { name: /analyse this property/i }).click();
+    const section = page.getByRole("heading", { name: /in plain language/i }).locator("..");
+    await expect(section).toBeVisible();
+    await expect(section.getByText(/turned off for this deployment/i)).toBeVisible();
+    // And the figures are untouched by its absence.
+    await expect(page.getByTestId("buy-score")).toBeVisible();
+  });
+
   test("an impossible down payment is refused with a readable reason", async ({ page }) => {
     await page.goto("/");
     await page.getByLabel("Down payment").fill("10000");

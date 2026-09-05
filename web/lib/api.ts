@@ -37,6 +37,25 @@ export interface TraceOut {
   rule_keys: string[];
 }
 
+/**
+ * Prose over a finished analysis, and the only AI-authored text in the payload.
+ *
+ * It contributes no numbers. Everything it mentions was computed first and handed
+ * to the model, and the backend's numeric guard discards the whole explanation if
+ * a figure appears that was never supplied — so this either arrives verified or
+ * does not arrive at all.
+ */
+export interface ExplanationOut {
+  summary: string;
+  pros: string[];
+  cons: string[];
+  questions: string[];
+  what_would_change_this: string[];
+  model_id: string;
+  numeric_guard_passed: boolean;
+  source: string;
+}
+
 export interface AnalyzeResponse {
   scoring_model_version: string;
   rule_set: string;
@@ -87,6 +106,9 @@ export interface AnalyzeResponse {
   traces: TraceOut[];
   assumptions: { key: string; value: unknown; rationale: string }[];
   unavailable: { component?: string; reason: string }[];
+  /** Exactly one of these is populated. */
+  explanation: ExplanationOut | null;
+  explanation_unavailable_reason: string | null;
   disclaimer: string;
 }
 
