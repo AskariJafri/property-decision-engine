@@ -77,6 +77,36 @@ class TestRequestShape:
         assert seen["seed"] == 7
         assert seen["model"] == "llama3.1:8b-instruct-q4_K_M"
 
+    async def test_response_format_carries_no_vendor_extensions(self):
+        """The documented OpenAI shape, and no vendor extension.
+
+        A nested "schema" key here is an Ollama-ism rather than part of the spec
+        the hosted tiers implement. Pinned because the local model accepts the
+        extension happily, so a stricter host is the only thing that would ever
+        surface it — in production, on the path with no local coverage.
+        """
+        seen: dict[str, object] = {}
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            seen.update(json.loads(request.content))
+            return reply({"ok": True})
+
+        client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+        async with client:
+            await OpenAICompatibleProvider(Settings(), client).complete_json(
+                system="s", user="u", schema={"type": "object", "required": ["summary"]}
+            )
+
+        assert seen["response_format"] == {"type": "json_object"}
+
+    async def test_the_generation_budget_fits_inside_a_serverless_function(self):
+        """A timeout longer than the host's function limit cannot be reached: the
+        platform kills the request first and the caller loses the whole analysis
+        instead of degrading to no prose. Vercel Hobby caps at 60s."""
+        settings = Settings()
+        assert settings.llm_timeout_seconds < 60
+        assert settings.llm_connect_timeout_seconds < settings.llm_timeout_seconds
+
 
 class TestFailures:
     async def test_an_unreachable_model_is_unavailable_not_an_error(self):

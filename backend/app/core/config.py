@@ -48,7 +48,16 @@ class Settings(BaseSettings):
 
     llm_temperature: float = 0.0
     llm_seed: int = 7
-    llm_timeout_seconds: float = 90.0
+    llm_timeout_seconds: float = 30.0
+    """Generation budget, and it has to fit inside the host's function limit.
+
+    Vercel caps a Hobby function at 60s, so the old 90s could not be reached: the
+    platform killed the request first and the caller lost the whole analysis
+    instead of degrading to no prose. 30s leaves room for the geocode and route
+    that run before it. A slow local CPU may want more — raise it there, where
+    nothing is enforcing a ceiling.
+    """
+
     llm_max_tokens: int = 1024
 
     # Off unless asked for, and the default base URL is why. It points at

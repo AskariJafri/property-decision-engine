@@ -52,9 +52,15 @@ class OpenAICompatibleProvider:
             "temperature": self._settings.llm_temperature,
             "seed": self._settings.llm_seed,
             "max_tokens": max_tokens,
-            # Ollama and most compatible servers honour this; those that do not still
-            # get the instruction in the system prompt, and validation catches the rest.
-            "response_format": {"type": "json_object", "schema": schema},
+            # The plain OpenAI shape, and deliberately nothing more. A nested
+            # "schema" key here is an Ollama extension, not part of the spec that
+            # Groq, OpenAI and OpenRouter implement; several validate request
+            # bodies strictly, and an unknown property is the kind of thing that
+            # fails only in production, since the local model accepts it happily.
+            # Sending the documented shape costs nothing: the schema is enforced
+            # in the system prompt and by the caller, which discards output that
+            # does not conform rather than repairing it.
+            "response_format": {"type": "json_object"},
         }
 
         # A bearer token when one is set, nothing when it is not: Ollama wants no

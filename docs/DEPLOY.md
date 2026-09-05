@@ -153,6 +153,30 @@ PDE_LLM_MODEL                = <the exact tag, never an alias>
 PDE_LLM_API_KEY              = <the key, if the endpoint wants one>
 ```
 
+Free tiers that speak this shape, all verified to accept the request body this
+provider sends:
+
+| | Base URL | A model to start with |
+|---|---|---|
+| Groq | `https://api.groq.com/openai/v1` | `llama-3.3-70b-versatile` |
+| Cerebras | `https://api.cerebras.ai/v1` | `llama3.1-8b` |
+| OpenRouter | `https://openrouter.ai/api/v1` | `meta-llama/llama-3.3-70b-instruct:free` |
+
+Groq is the default recommendation, on latency rather than quality: this call sits
+inside a serverless function with a hard ceiling, so a fast model that finishes is
+worth more than a better one that gets killed.
+
+**The key is a secret and belongs only in the host's environment settings.** Never
+in the repository, never in `.env.example`, and not in a chat log — including this
+one. Add it yourself in the Vercel dashboard.
+
+**The generation budget has to fit inside the function.** Vercel caps a Hobby
+function at 60s; `backend/vercel.json` asks for that ceiling explicitly, and
+`PDE_LLM_TIMEOUT_SECONDS` defaults to 30s so the model cannot outlive the request
+that is waiting on it. A timeout longer than the platform's limit is not a longer
+timeout — it is the platform killing the function and the caller losing the whole
+analysis instead of degrading to no prose.
+
 **Do not turn the flag on without a reachable model.** The default base URL is
 `http://localhost:11434/v1`, and on a serverless host localhost is the function's
 own container: the call does not fail fast, it waits. A short connect timeout
