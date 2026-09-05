@@ -31,33 +31,48 @@ smaller product, not a broken one.
 
 Two projects from one repository. Both free, cold starts of a second or two.
 
-### 1. Push the repository
+**Import the same repository twice**, as two projects with different Root
+Directories. One repo, two deployments.
+
+**Do the backend first.** `NEXT_PUBLIC_*` variables are inlined into the
+JavaScript bundle at build time, not read at runtime, so the frontend has to know
+the API's URL *before* it builds. Doing it the other way round means building
+twice.
+
+### 1. Backend
+
+New Project → import `property-decision-engine` → **Root Directory: `backend`**.
+Framework preset: **Other**. `backend/vercel.json` routes every path to
+`api/index.py`, and `backend/requirements.txt` carries the runtime dependencies.
+
+Environment variables before deploying:
+
+```
+PDE_ENVIRONMENT   = production
+PDE_ORS_API_KEY   = <your key, for commute times>
+```
+
+Deploy, then note the URL — call it `https://<api>.vercel.app`. Check it:
 
 ```bash
-gh repo create property-decision-engine --private --source=. --push
+curl https://<api>.vercel.app/api/v1/health
 ```
 
 ### 2. Frontend
 
-New Vercel project → import the repo → **Root Directory: `web`**. Next.js is
-detected automatically. Add one environment variable once the API is deployed:
+New Project → import the **same repo again** → **Root Directory: `web`**. Next.js
+is detected automatically. Set this *before* the first deploy:
 
 ```
-NEXT_PUBLIC_API_BASE = https://<your-api-project>.vercel.app
+NEXT_PUBLIC_API_BASE = https://<api>.vercel.app
 ```
 
-### 3. Backend
+### 3. Close the loop
 
-A second Vercel project from the same repo → **Root Directory: `backend`**.
-`backend/vercel.json` routes everything to `api/index.py`, and
-`backend/requirements.txt` holds the runtime dependencies only.
-
-Environment variables:
+Go back to the backend project and add the frontend's origin, then redeploy it:
 
 ```
-PDE_ENVIRONMENT   = production
-PDE_CORS_ORIGINS  = https://<your-web-project>.vercel.app
-PDE_ORS_API_KEY   = <your key, if you want commute times>
+PDE_CORS_ORIGINS = https://<web>.vercel.app
 ```
 
 **`PDE_CORS_ORIGINS` is the one people forget.** Miss it and every browser request
