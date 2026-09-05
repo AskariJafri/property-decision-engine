@@ -132,8 +132,15 @@ jobs:
       - run: npx tsc --noEmit
         working-directory: web
 
+      # NEXT_PUBLIC_API_BASE is inlined at build time, so it has to be set here
+      # rather than before `next start`. Without it the production fallback is
+      # the empty string — same-origin — and the browser posts to the Next
+      # server on :3000 instead of the API on :8000. Every E2E test then fails
+      # for one reason that looks like eight different assertion failures.
       - run: npx next build
         working-directory: web
+        env:
+          NEXT_PUBLIC_API_BASE: http://127.0.0.1:8000
 
       - run: pip install -e ".[dev]"
         working-directory: backend
