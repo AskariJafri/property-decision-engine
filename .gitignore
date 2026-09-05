@@ -38,3 +38,6 @@ out/
 test-results/
 playwright-report/
 .playwright-mcp/
+
+# TypeScript incremental build cache
+*.tsbuildinfo

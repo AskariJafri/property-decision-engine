@@ -95,6 +95,28 @@ PDE_CORS_ORIGINS = https://<web>.vercel.app
 dies at the preflight while the API looks perfectly healthy to curl — the exact
 failure the E2E suite was written for.
 
+### The build that succeeds and fails anyway
+
+Vercel refuses to publish a Next.js build whose framework version carries a known
+critical advisory. The build log is not obviously a failure — it compiles, it
+prerenders every page, it prints the route table, and then the last line reads:
+
+```
+Vulnerable version of Next.js detected, please update immediately.
+```
+
+The deployment is marked *Build Failed* with the generic "project or build error"
+and an Upgrade button, none of which points at the version. The fix is to move to
+a patched release and push; nothing about the project configuration is wrong.
+
+This happened here on `next@15.1.3`, which sits inside the range of
+CVE-2025-29927 (middleware authorization bypass, patched in 15.2.3). The pin is
+now `15.5.25`, the current 15.x backport line.
+
+Worth knowing because the same block will fire again the next time an advisory
+lands and the pin has drifted behind it. A build that compiles is not evidence
+that the version is deployable.
+
 ### The licence caveat
 
 Vercel's Hobby plan is for **non-commercial** use. Fine for a personal project or
