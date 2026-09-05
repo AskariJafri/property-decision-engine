@@ -67,6 +67,22 @@ is detected automatically. Set this *before* the first deploy:
 NEXT_PUBLIC_API_BASE = https://<api>.vercel.app
 ```
 
+**You create this variable; it is not one you pick from a list.** Vercel's
+Environment Variables screen is two free-text boxes — type the name on the left
+and the value on the right. Nothing is pre-populated, and nothing validates the
+name, so a typo produces a build that succeeds and an app that cannot reach its
+API. The name must be exactly `NEXT_PUBLIC_API_BASE`: the `NEXT_PUBLIC_` prefix is
+what tells Next.js to expose it to the browser, and without it the value is
+visible only on the server, where this app never reads it.
+
+### The alternative that needs no variable at all
+
+Uncomment the `rewrites` block in `web/next.config.mjs`, put your API's URL in it,
+and the frontend proxies `/api/*` through its own origin. Then there is no
+`NEXT_PUBLIC_API_BASE` to set and no `PDE_CORS_ORIGINS` to get wrong, because the
+browser only ever talks to one host. The cost is that the URL lives in a committed
+file rather than in project settings.
+
 ### 3. Close the loop
 
 Go back to the backend project and add the frontend's origin, then redeploy it:

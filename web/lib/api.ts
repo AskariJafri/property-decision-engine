@@ -90,7 +90,22 @@ export interface AnalyzeResponse {
   disclaimer: string;
 }
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:8000";
+/**
+ * Where the API lives.
+ *
+ * Set NEXT_PUBLIC_API_BASE at build time — it is inlined into the bundle, so it
+ * has to exist before the build, not after.
+ *
+ * The fallback differs by environment on purpose. In development, localhost is
+ * what you want. In production, falling back to localhost would send a visitor's
+ * browser to *their own machine*, and the resulting connection error looks like
+ * their computer is broken rather than like a missing variable. An empty base
+ * calls this app's own origin instead, which either works via a rewrite proxy or
+ * fails as an honest 404 from a host that is actually there.
+ */
+const API_BASE =
+  process.env.NEXT_PUBLIC_API_BASE ??
+  (process.env.NODE_ENV === "production" ? "" : "http://localhost:8000");
 
 export async function analyze(body: unknown): Promise<AnalyzeResponse> {
   const response = await fetch(`${API_BASE}/api/v1/properties/analyze`, {
