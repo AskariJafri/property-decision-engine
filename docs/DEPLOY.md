@@ -11,6 +11,20 @@ request, which is inconvenient for a product and extremely convenient for hostin
 
 ---
 
+## What is deployed
+
+| | |
+|---|---|
+| Frontend | <https://property-decision-engine-web.vercel.app> |
+| API | <https://property-decision-engine-gules.vercel.app> |
+| Health | <https://property-decision-engine-gules.vercel.app/api/v1/health> |
+
+Both are Vercel Hobby projects built from this one repository, differing only in Root
+Directory. Commute times are live against OpenRouteService; amenity counts and AI
+explanations report themselves unavailable, as the table below says they will.
+
+---
+
 ## What you get, and what you give up
 
 | | Free deployment | Local with everything running |
@@ -94,6 +108,13 @@ PDE_CORS_ORIGINS = https://<web>.vercel.app
 **`PDE_CORS_ORIGINS` is the one people forget.** Miss it and every browser request
 dies at the preflight while the API looks perfectly healthy to curl — the exact
 failure the E2E suite was written for.
+
+It is an exact list, not a pattern. That means **preview deployments will fail at the
+preflight**, because each one gets its own hostname and none of them is the production
+origin. This is deliberate: a wildcard wide enough to cover previews would be
+`*.vercel.app`, which lets any site hosted on Vercel make credentialed calls to an
+endpoint that receives a household's income and debts. If you need a preview to work,
+add that specific preview origin.
 
 ### The build that succeeds and fails anyway
 

@@ -15,6 +15,12 @@ full working. Phases A–E are complete; F–K are partial and L has not started
 
 ![A completed analysis](docs/images/analysis-example.png)
 
+**Try it:** <https://property-decision-engine-web.vercel.app>
+
+Deployed free on Vercel. Commute times are live; amenity counts and AI explanations report
+themselves unavailable there, because they need the self-hosted OpenStreetMap stack and a local
+model. Nothing is saved — there are no accounts yet.
+
 **Run it:** two terminals, no database or Docker required.
 
 ```bash
