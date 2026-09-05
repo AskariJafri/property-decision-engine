@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 from functools import lru_cache
-from typing import Literal
+from typing import Any, Literal
 
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -59,6 +60,29 @@ class Settings(BaseSettings):
     session_secret: str = "dev-only-not-a-secret"
     analysis_rate_limit_per_hour: int = 10
     listing_parse_rate_limit_per_day: int = 20
+
+    @model_validator(mode="before")
+    @classmethod
+    def blank_means_unset(cls, data: Any) -> Any:
+        """Treat an empty environment variable as absent, so the default applies.
+
+        Deployment platforms make blank values trivially easy to create — an
+        imported .env template, a key added before its value is known, a copied
+        row. Pydantic reads "" as a value and rejects it for anything that is not
+        a string, so a blank PDE_LLM_SEED took down the entire application at
+        import with five validation errors and a 500 that says nothing about
+        which variable is at fault.
+
+        A variable that is present but empty is one nobody has set yet. Dropping
+        it here is the difference between a working deployment and an outage.
+        """
+        if isinstance(data, dict):
+            return {
+                key: value
+                for key, value in data.items()
+                if not (isinstance(value, str) and not value.strip())
+            }
+        return data
 
 
 @lru_cache
