@@ -17,9 +17,16 @@ full working. Phases A–E are complete; F–K are partial and L has not started
 
 **Try it:** <https://property-decision-engine-web.vercel.app>
 
-Deployed free on Vercel. Commute times are live; amenity counts and AI explanations report
-themselves unavailable there, because they need the self-hosted OpenStreetMap stack and a local
-model. Nothing is saved — there are no accounts yet.
+Deployed free on Vercel. Commute times are live. Amenity counts report themselves unavailable,
+because they need the self-hosted OpenStreetMap stack.
+
+**The analysis carries no AI.** Not because of the deployment — because nothing is wired into
+the response yet, here or locally. The provider, the judgement runtime, the influence caps and
+the numeric guard are built and tested, but no endpoint calls them (ROADMAP phase J). Every
+number you see is deterministic, which is the intended default: AI was only ever allowed in as
+a bounded input, never as the calculator.
+
+Nothing is saved — there are no accounts yet.
 
 **Run it:** two terminals, no database or Docker required.
 

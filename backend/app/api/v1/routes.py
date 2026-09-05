@@ -57,8 +57,15 @@ async def health() -> dict[str, Any]:
             "nominatim": bool(settings.nominatim_url),
             "routing": bool(settings.routing_url),
             "overpass": bool(settings.overpass_url),
-            "local_model": bool(settings.llm_base_url),
         },
+        # Reported separately from the providers above, and deliberately not as
+        # a "configured" flag. llm_base_url has a non-empty default, so
+        # bool(...) on it is true on every deployment that has never seen a
+        # model — it read as "AI is on" while no endpoint called a model at all.
+        # The analyze path is entirely deterministic today: the provider,
+        # judgement runtime and caps exist and are tested, but nothing is wired
+        # into the response (ROADMAP phase J).
+        "ai_in_analysis": False,
     }
 
 

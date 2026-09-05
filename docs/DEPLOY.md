@@ -20,8 +20,11 @@ request, which is inconvenient for a product and extremely convenient for hostin
 | Health | <https://property-decision-engine-gules.vercel.app/api/v1/health> |
 
 Both are Vercel Hobby projects built from this one repository, differing only in Root
-Directory. Commute times are live against OpenRouteService; amenity counts and AI
-explanations report themselves unavailable, as the table below says they will.
+Directory. Commute times are live against OpenRouteService; amenity counts report
+themselves unavailable, as the table below says they will.
+
+The analysis contains no AI on either deployment. That is a wiring gap, not a hosting
+one — see the table below and ROADMAP phase J.
 
 ---
 
@@ -33,7 +36,7 @@ explanations report themselves unavailable, as the table below says they will.
 | Listing paste and PDF upload | works | works |
 | Commute / Location | works with an ORS key | works, self-hosted |
 | Amenity counts | unavailable, stated | needs Overpass |
-| AI explanations | unavailable, stated | needs a local model |
+| AI explanations | not wired in | not wired in (ROADMAP J) |
 | Saved analyses | not built yet | not built yet |
 
 Every absent piece reports itself rather than failing, so a free deployment is a
