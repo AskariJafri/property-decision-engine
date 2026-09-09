@@ -156,8 +156,14 @@ async def explain(analysis: dict[str, Any], provider: LlmProvider) -> Explanatio
     user = f"Explain this analysis. Facts you may use, and nothing else:\n\n{_stable_json(bundle)}"
     prompt_hash = hashlib.sha256((SYSTEM_PROMPT + user).encode()).hexdigest()
 
+    # 900 was sized for a model that writes its answer directly. A reasoning
+    # model thinks first and charges that to the same budget, so the JSON was
+    # still unfinished when the cap arrived — which Groq reports as a 400, not a
+    # short answer, taking the prose down on every real analysis. 2500 clears the
+    # thinking plus the document; the schema, not the cap, is what keeps the
+    # reply short.
     raw = await provider.complete_json(
-        system=SYSTEM_PROMPT, user=user, schema=OUTPUT_SCHEMA, max_tokens=900
+        system=SYSTEM_PROMPT, user=user, schema=OUTPUT_SCHEMA, max_tokens=2500
     )
 
     missing = [key for key in OUTPUT_SCHEMA["required"] if key not in raw]

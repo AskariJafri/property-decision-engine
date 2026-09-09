@@ -108,6 +108,38 @@ class TestRequestShape:
         assert settings.llm_connect_timeout_seconds < settings.llm_timeout_seconds
 
 
+    async def test_reasoning_effort_is_sent_only_when_configured(self):
+        """The key must be absent, not empty, when nothing asked for it.
+
+        A reasoning model charges its thinking to the same budget as the answer,
+        and on Groq an unfinished JSON document is a 400 (json_validate_failed)
+        rather than a short reply — so "low" is what makes gpt-oss-120b usable.
+        It is not part of the OpenAI shape, though, and the strict validators
+        this provider already avoids nesting "schema" for would reject it just
+        as readily. Absent by default is what keeps Ollama working.
+        """
+        seen: dict[str, object] = {}
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            seen.update(json.loads(request.content))
+            return reply({"ok": True})
+
+        client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+        async with client:
+            await OpenAICompatibleProvider(Settings(), client).complete_json(
+                system="s", user="u", schema=SCHEMA
+            )
+        assert "reasoning_effort" not in seen
+
+        seen.clear()
+        client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+        async with client:
+            await OpenAICompatibleProvider(
+                Settings(llm_reasoning_effort="low"), client
+            ).complete_json(system="s", user="u", schema=SCHEMA)
+        assert seen["reasoning_effort"] == "low"
+
+
 class TestFailures:
     async def test_an_unreachable_model_is_unavailable_not_an_error(self):
         def refuse(request: httpx.Request) -> httpx.Response:

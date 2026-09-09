@@ -60,6 +60,20 @@ class Settings(BaseSettings):
 
     llm_max_tokens: int = 1024
 
+    llm_reasoning_effort: str = ""
+    """Sent only when set, because it is not part of the OpenAI shape.
+
+    A reasoning model spends tokens thinking before it writes, and those tokens
+    come out of the same budget as the answer. On Groq that is not a truncated
+    reply but a hard 400: with response_format=json_object it validates the
+    output, finds an unfinished document and rejects the whole request with
+    json_validate_failed. gpt-oss-120b hit that on every real analysis.
+
+    "low" keeps the thinking short enough that the JSON lands. Blank means the
+    key is absent from the payload entirely, which is what Ollama and anything
+    else that validates strictly need to keep working.
+    """
+
     # Off unless asked for, and the default base URL is why. It points at
     # localhost, which on a serverless host is the function's own container: a
     # request there does not fail fast, it hangs until the timeout and takes the

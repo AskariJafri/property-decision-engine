@@ -170,6 +170,21 @@ worth more than a better one that gets killed.
 in the repository, never in `.env.example`, and not in a chat log — including this
 one. Add it yourself in the Vercel dashboard.
 
+**A reasoning model needs `PDE_LLM_REASONING_EFFORT`.** Groq's `openai/gpt-oss-120b`
+thinks before it answers and charges that thinking to the same token budget as the
+reply. With `response_format=json_object` an unfinished document is not a truncated
+answer — Groq validates it, fails, and returns **400 `json_validate_failed`**, so
+every analysis loses its prose. Set:
+
+```
+PDE_LLM_REASONING_EFFORT = low
+```
+
+It is sent only when non-empty, because it is not part of the OpenAI shape and the
+strict validators would reject it. Leave it blank for Ollama and for models that
+answer directly. The explanation budget is 2500 tokens (`ai/explainer.py`), sized
+for the thinking plus the document.
+
 **The generation budget has to fit inside the function.** Vercel caps a Hobby
 function at 60s; `backend/vercel.json` asks for that ceiling explicitly, and
 `PDE_LLM_TIMEOUT_SECONDS` defaults to 30s so the model cannot outlive the request

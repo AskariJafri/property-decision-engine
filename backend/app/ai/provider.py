@@ -63,6 +63,12 @@ class OpenAICompatibleProvider:
             "response_format": {"type": "json_object"},
         }
 
+        # Only when configured. See Settings.llm_reasoning_effort: it is not in
+        # the OpenAI shape, so sending it unconditionally would break the strict
+        # validators the block above is careful about.
+        if self._settings.llm_reasoning_effort:
+            payload["reasoning_effort"] = self._settings.llm_reasoning_effort
+
         # A bearer token when one is set, nothing when it is not: Ollama wants no
         # Authorization header, and every hosted tier requires one.
         headers = (
