@@ -19,6 +19,7 @@ import {
   ScoreBreakdown,
   Working,
 } from "@/components/Analysis";
+import { ComparableGrid } from "@/components/ComparableGrid";
 import {
   ComparablesInput,
   EMPTY_ROW,
@@ -371,6 +372,7 @@ export default function Home() {
         <div className="space-y-8">
           <BuyScore result={result} />
           <Money result={result} />
+          <ComparableGrid grid={result.comparable_grid} />
           <Factors result={result} />
           <Explanation result={result} />
           <ScoreBreakdown scores={result.scores} />

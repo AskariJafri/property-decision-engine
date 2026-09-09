@@ -56,6 +56,42 @@ export interface ExplanationOut {
   source: string;
 }
 
+/** One line of the adjustment grid. */
+export interface Adjustment {
+  attribute: string;
+  subject_value: string;
+  comparable_value: string;
+  /** Signed: positive means the comparable was inferior and was adjusted up. */
+  amount_cents: number;
+  basis: string;
+}
+
+export interface UnadjustedAttribute {
+  attribute: string;
+  reason: string;
+}
+
+export interface AdjustedComparable {
+  address: string;
+  sale_price_cents: number;
+  sale_date: string;
+  similarity: number;
+  included: boolean;
+  reason: string;
+  adjustments: Adjustment[];
+  unadjusted: UnadjustedAttribute[];
+  adjusted_price_cents: number;
+  net_adjustment_cents: number;
+  gross_adjustment_cents: number;
+  gross_adjustment_ratio: number;
+}
+
+export interface ComparableGrid {
+  rows: AdjustedComparable[];
+  price_per_square_foot_cents: number | null;
+  over_adjusted: string[];
+}
+
 export interface AnalyzeResponse {
   scoring_model_version: string;
   rule_set: string;
@@ -102,6 +138,7 @@ export interface AnalyzeResponse {
     confidence: number;
     note: string;
   };
+  comparable_grid: ComparableGrid;
   risks: RiskOut[];
   traces: TraceOut[];
   assumptions: { key: string; value: unknown; rationale: string }[];
