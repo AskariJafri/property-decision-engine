@@ -18,6 +18,7 @@ from decimal import Decimal
 
 from app.core.money import Cents, apply_rate, cents
 from app.engines.base import EngineResult, TraceBuilder
+from app.engines.comparables.contracts import AdjustedComparable
 from app.engines.valuation.contracts import (
     Comparable,
     FairValueRange,
@@ -102,6 +103,7 @@ def compute_fair_value(
     asking_price_cents: Cents,
     comparables: tuple[ScoredComparable, ...],
     subject_square_feet: int | None = None,
+    adjusted: tuple[AdjustedComparable, ...] | None = None,
 ) -> EngineResult[FairValueRange]:
     """A range, never a point. "Fair value $832,451" is a lie about precision."""
     trace = TraceBuilder()
@@ -126,7 +128,25 @@ def compute_fair_value(
         )
     else:
         weight_total = sum((c.weight for c in included), start=Decimal(0))
-        if subject_square_feet and all(c.comparable.square_feet for c in included):
+        adjusted_rows = [r for r in (adjusted or ()) if r.scored.included]
+        if adjusted_rows and len(adjusted_rows) == len(included):
+            # Every included sale has already been restated as an estimate of the
+            # subject, so a plain weighted mean is now the right operation: the size
+            # normalisation the price-per-square-foot branch below does implicitly has
+            # been done explicitly, per comparable, with the working attached — and it
+            # applies to comparables that stated no floor area, which that branch has
+            # to fall back past.
+            centre = cents(
+                int(
+                    sum(
+                        (Decimal(r.adjusted_price_cents) * r.scored.weight for r in adjusted_rows),
+                        start=Decimal(0),
+                    )
+                    / weight_total
+                )
+            )
+            method = "similarity-weighted mean of adjusted sale prices"
+        elif subject_square_feet and all(c.comparable.square_feet for c in included):
             # Price per square foot, weighted by similarity, applied to the subject.
             psf = (
                 sum(

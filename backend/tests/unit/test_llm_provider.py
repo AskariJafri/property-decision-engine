@@ -107,7 +107,6 @@ class TestRequestShape:
         assert settings.llm_timeout_seconds < 60
         assert settings.llm_connect_timeout_seconds < settings.llm_timeout_seconds
 
-
     async def test_reasoning_effort_is_sent_only_when_configured(self):
         """The key must be absent, not empty, when nothing asked for it.
 

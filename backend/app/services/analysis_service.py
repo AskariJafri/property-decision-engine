@@ -19,6 +19,7 @@ from typing import Any
 
 from app.core.money import Cents, cents
 from app.engines.base import EngineResult
+from app.engines.comparables.engine import build_grid
 from app.engines.financial.contracts import (
     BuyerFinancials,
     MortgageTerms,
@@ -42,9 +43,12 @@ from app.engines.scoring.subscores import (
 from app.engines.valuation.contracts import Comparable, RiskFlag
 from app.engines.valuation.engine import compute_fair_value, score_comparable, suggested_offer
 from app.schemas.analysis import (
+    AdjustedComparableOut,
+    AdjustmentOut,
     AnalyzeRequest,
     AnalyzeResponse,
     AssumptionOut,
+    ComparableGridOut,
     FactorOut,
     FairValueOut,
     MoneyOut,
@@ -52,6 +56,7 @@ from app.schemas.analysis import (
     RiskOut,
     ScoreOut,
     TraceOut,
+    UnadjustedAttributeOut,
 )
 
 
@@ -156,10 +161,21 @@ class AnalysisService:
             )
             for c in request.comparables
         )
+        # The adjustment grid restates each sale as an estimate of the subject before
+        # anything averages them, so it has to be built first. With no comparables it
+        # is an empty grid and compute_fair_value falls back to the asking-price band
+        # exactly as before.
+        grid = build_grid(
+            comparables=scored_comps,
+            subject_square_feet=request.property.square_feet,
+            subject_bedrooms=request.property.bedrooms,
+            as_of=as_of,
+        )
         fair_value = compute_fair_value(
             asking_price_cents=property_.purchase_price_cents,
             comparables=scored_comps,
             subject_square_feet=request.property.square_feet,
+            adjusted=grid.value.rows,
         )
         offer_low, offer_high = suggested_offer(
             fair_value=fair_value.value, asking_price_cents=property_.purchase_price_cents
@@ -246,6 +262,7 @@ class AnalysisService:
             offer=(offer_low, offer_high),
             risk_flags=risk_flags,
             scored_comps=scored_comps,
+            grid=grid.value,
             as_of=as_of,
         )
 
@@ -347,6 +364,39 @@ class AnalysisService:
                 basis=kw["fair_value"].basis.value,
                 confidence=float(kw["fair_value"].confidence),
                 note=kw["fair_value"].note,
+            ),
+            comparable_grid=ComparableGridOut(
+                price_per_square_foot_cents=kw["grid"].price_per_square_foot_cents,
+                over_adjusted=list(kw["grid"].over_adjusted),
+                rows=[
+                    AdjustedComparableOut(
+                        address=row.scored.comparable.address,
+                        sale_price_cents=row.scored.comparable.sale_price_cents,
+                        sale_date=row.scored.comparable.sale_date.isoformat(),
+                        similarity=float(row.scored.similarity),
+                        included=row.scored.included,
+                        reason=row.scored.reason,
+                        adjustments=[
+                            AdjustmentOut(
+                                attribute=a.attribute,
+                                subject_value=a.subject_value,
+                                comparable_value=a.comparable_value,
+                                amount_cents=a.amount_cents,
+                                basis=a.basis,
+                            )
+                            for a in row.adjustments
+                        ],
+                        unadjusted=[
+                            UnadjustedAttributeOut(attribute=u.attribute, reason=u.reason)
+                            for u in row.unadjusted
+                        ],
+                        adjusted_price_cents=row.adjusted_price_cents,
+                        net_adjustment_cents=row.net_adjustment_cents,
+                        gross_adjustment_cents=row.gross_adjustment_cents,
+                        gross_adjustment_ratio=float(row.gross_adjustment_ratio),
+                    )
+                    for row in kw["grid"].rows
+                ],
             ),
             risks=[
                 RiskOut(

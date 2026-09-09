@@ -194,6 +194,51 @@ class FairValueOut(BaseModel):
     note: str
 
 
+class AdjustmentOut(BaseModel):
+    """One line of the adjustment grid."""
+
+    attribute: str
+    subject_value: str
+    comparable_value: str
+    amount_cents: int
+    """Signed. Positive means the comparable was inferior and its price was adjusted
+    up to stand in for the subject."""
+
+    basis: str
+
+
+class UnadjustedAttributeOut(BaseModel):
+    attribute: str
+    reason: str
+
+
+class AdjustedComparableOut(BaseModel):
+    address: str
+    sale_price_cents: int
+    sale_date: str
+    similarity: float
+    included: bool
+    reason: str
+    adjustments: list[AdjustmentOut]
+    unadjusted: list[UnadjustedAttributeOut]
+    adjusted_price_cents: int
+    net_adjustment_cents: int
+    gross_adjustment_cents: int
+    gross_adjustment_ratio: float
+
+
+class ComparableGridOut(BaseModel):
+    """The sales comparison approach, shown rather than summarised.
+
+    Rendered as a grid because that is the artifact a buyer can put in front of a
+    seller: every sale, every adjustment, and the rate each one used.
+    """
+
+    rows: list[AdjustedComparableOut]
+    price_per_square_foot_cents: int | None
+    over_adjusted: list[str]
+
+
 class ExplanationOut(BaseModel):
     """Prose over a finished analysis. Never a source of numbers (ADR 0004).
 
@@ -228,6 +273,7 @@ class AnalyzeResponse(BaseModel):
     closing_cost_lines: list[dict[str, Any]]
     qualification: QualificationOut
     fair_value: FairValueOut
+    comparable_grid: ComparableGridOut
     risks: list[RiskOut]
     traces: list[TraceOut]
     assumptions: list[AssumptionOut]
