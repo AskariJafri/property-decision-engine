@@ -21,14 +21,19 @@ from app.core.money import Cents, cents
 from app.engines.base import EngineResult
 from app.engines.comparables.engine import build_grid
 from app.engines.financial.contracts import (
+    AffordabilityResult,
     BuyerFinancials,
+    MortgageResult,
     MortgageTerms,
+    OwnershipCostResult,
     PropertyFinancials,
     PropertyKind,
     ResidencyStatus,
 )
 from app.engines.financial.engine import DeterministicFinancialEngine
+from app.engines.risk.missing_info import MissingInfoInput, missing_information
 from app.engines.rules import RuleSet
+from app.engines.scenarios.personal import PersonalInput, personal_fit
 from app.engines.scoring.contracts import BuyScore, CappedAdjustment, Component, Factor
 from app.engines.scoring.engine import aggregate, modifiers_for, unavailable
 from app.engines.scoring.subscores import (
@@ -49,10 +54,15 @@ from app.schemas.analysis import (
     AnalyzeResponse,
     AssumptionOut,
     ComparableGridOut,
+    DataBasis,
     FactorOut,
     FairValueOut,
+    MissingItemOut,
     MoneyOut,
+    MonthlyLineOut,
+    PersonalOut,
     QualificationOut,
+    RateScenarioOut,
     RiskOut,
     ScoreOut,
     TraceOut,
@@ -90,30 +100,7 @@ class AnalysisService:
         risk_adjustment: CappedAdjustment | None = None,
         location: LocationFacts | None = None,
     ) -> AnalyzeResponse:
-        property_ = PropertyFinancials(
-            purchase_price_cents=cents(request.property.purchase_price_cents),
-            jurisdiction=request.property.jurisdiction,
-            property_kind=PropertyKind(request.property.property_kind),
-            annual_property_tax_cents=_opt_cents(request.property.annual_property_tax_cents),
-            monthly_condo_fee_cents=_opt_cents(request.property.monthly_condo_fee_cents),
-            square_feet=request.property.square_feet,
-            is_new_build=request.property.is_new_build,
-        )
-        buyer = BuyerFinancials(
-            gross_annual_income_cents=cents(request.buyer.gross_annual_income_cents),
-            household_income_cents=cents(request.buyer.household_income_cents),
-            monthly_debt_payments_cents=cents(request.buyer.monthly_debt_payments_cents),
-            down_payment_cents=cents(request.buyer.down_payment_cents),
-            available_savings_cents=cents(request.buyer.available_savings_cents),
-            emergency_fund_cents=cents(request.buyer.emergency_fund_cents),
-            desired_max_monthly_cents=_opt_cents(request.buyer.desired_max_monthly_cents),
-            first_time_buyer=request.buyer.first_time_buyer,
-            residency_status=ResidencyStatus(request.buyer.residency_status),
-        )
-        terms = MortgageTerms(
-            contract_rate=request.terms.contract_rate,
-            amortization_years=request.terms.amortization_years,
-        )
+        property_, buyer, terms = to_domain(request)
 
         # --- money, deterministically -------------------------------------------------
         mortgage = self.financial.mortgage(
@@ -248,7 +235,7 @@ class AnalysisService:
             fair_value,
         )
         extra_factors = qualification_factors(qualification.value)
-        return self._render(
+        response = self._render(
             request=request,
             buy=buy,
             results=results,
@@ -265,6 +252,202 @@ class AnalysisService:
             grid=grid.value,
             as_of=as_of,
         )
+        self._decorate(
+            response,
+            request=request,
+            property_=property_,
+            buyer=buyer,
+            terms=terms,
+            mortgage=mortgage.value,
+            ownership=ownership.value,
+            affordability=affordability.value,
+            comparables_included=sum(1 for c in scored_comps if c.included),
+            as_of=as_of,
+        )
+        return response
+
+    def _decorate(
+        self,
+        response: AnalyzeResponse,
+        *,
+        request: AnalyzeRequest,
+        property_: PropertyFinancials,
+        buyer: BuyerFinancials,
+        terms: MortgageTerms,
+        mortgage: MortgageResult,
+        ownership: OwnershipCostResult,
+        affordability: AffordabilityResult,
+        comparables_included: int,
+        as_of: date,
+    ) -> None:
+        """The free analysis's plain-language layer: labels, gaps, fit and rates.
+
+        Everything here is derived from figures already computed above; it adds
+        labels and arrangement, never a new estimate.
+        """
+        is_condo = property_.property_kind in (
+            PropertyKind.CONDO_APARTMENT,
+            PropertyKind.CONDO_TOWNHOUSE,
+        )
+        tax_supplied = request.property.annual_property_tax_cents is not None
+        tax_basis: DataBasis = (
+            "user_provided"
+            if tax_supplied
+            else ("estimated" if ownership.property_tax_cents > 0 else "unavailable")
+        )
+        tax_notes: dict[str, str] = {
+            "user_provided": "From the annual figure you entered.",
+            "estimated": "Estimated from the municipal rate applied to the price.",
+            "unavailable": "No rate for this municipality; enter the figure from the listing.",
+        }
+        lines = [
+            MonthlyLineOut(
+                key="mortgage_payment",
+                label="Mortgage payment",
+                amount_cents=ownership.mortgage_payment_cents,
+                basis="known",
+                note="Calculated from the price, your down payment, rate and amortization.",
+            ),
+            MonthlyLineOut(
+                key="property_tax",
+                label="Property tax",
+                amount_cents=ownership.property_tax_cents if tax_basis != "unavailable" else None,
+                basis=tax_basis,
+                note=tax_notes[tax_basis],
+            ),
+        ]
+        if is_condo:
+            fee_known = request.property.monthly_condo_fee_cents is not None
+            lines.append(
+                MonthlyLineOut(
+                    key="condo_fee",
+                    label="Condo fee",
+                    amount_cents=ownership.condo_fee_cents if fee_known else None,
+                    basis="user_provided" if fee_known else "unavailable",
+                    note="As entered."
+                    if fee_known
+                    else "Not supplied, so not included in the total.",
+                )
+            )
+        lines += [
+            MonthlyLineOut(
+                key="insurance",
+                label="Home insurance",
+                amount_cents=ownership.insurance_cents,
+                basis="assumption",
+                note="Planning default for an Ontario policy; replace with a quote.",
+            ),
+            MonthlyLineOut(
+                key="utilities",
+                label="Utilities",
+                amount_cents=ownership.utilities_cents,
+                basis="assumption",
+                note="Planning default; varies with the home and season.",
+            ),
+            MonthlyLineOut(
+                key="maintenance",
+                label="Maintenance reserve",
+                amount_cents=ownership.maintenance_reserve_cents,
+                basis="assumption",
+                note="A share of the price set aside each year for repairs.",
+            ),
+        ]
+        response.monthly_breakdown = lines
+        response.money_labels = {
+            "purchase_price_cents": "user_provided",
+            "down_payment_cents": "user_provided",
+            "mortgage_principal_cents": "known",
+            "insurance_premium_cents": "known",
+            "monthly_ownership_cost_cents": "estimated",
+            "closing_costs_cents": "estimated",
+            "cash_required_cents": "estimated",
+            "cash_shortfall_cents": "estimated",
+        }
+
+        response.missing_info = [
+            MissingItemOut(
+                key=item.key,
+                title=item.title,
+                why_it_matters=item.why_it_matters,
+                what_to_ask_for=item.what_to_ask_for,
+                severity=item.severity,
+                category=item.category,
+            )
+            for item in missing_information(
+                MissingInfoInput(
+                    property_kind=property_.property_kind.value,
+                    annual_property_tax_supplied=tax_supplied,
+                    property_tax_estimated=tax_basis == "estimated",
+                    monthly_condo_fee_supplied=request.property.monthly_condo_fee_cents is not None,
+                    year_built=request.property.year_built,
+                    as_of_year=as_of.year,
+                    square_feet=request.property.square_feet,
+                    bedrooms=request.property.bedrooms,
+                    address_supplied=bool(request.property.address),
+                    comparables_included=comparables_included,
+                    is_new_build=request.property.is_new_build,
+                )
+            )
+        ]
+
+        fit = personal_fit(
+            PersonalInput(
+                gross_annual_income_cents=request.buyer.household_income_cents,
+                monthly_net_income_cents=request.buyer.monthly_net_income_cents,
+                monthly_debt_payments_cents=request.buyer.monthly_debt_payments_cents,
+                other_monthly_expenses_cents=request.buyer.other_monthly_expenses_cents,
+                monthly_housing_cost_cents=ownership.total_monthly_cents,
+                cash_required_cents=affordability.cash_required_cents,
+                available_savings_cents=request.buyer.available_savings_cents,
+                emergency_fund_cents=request.buyer.emergency_fund_cents,
+            )
+        )
+        response.personal = PersonalOut(
+            lines=[
+                MonthlyLineOut(
+                    key=line.key,
+                    label=line.label,
+                    amount_cents=line.amount_cents,
+                    basis=line.basis,
+                    note=line.note,
+                )
+                for line in fit.lines
+            ],
+            housing_share_of_gross=float(fit.housing_share_of_gross),
+            emergency_months=float(fit.emergency_months)
+            if fit.emergency_months is not None
+            else None,
+        )
+
+        scenarios = []
+        for delta in (Decimal("0"), Decimal("0.01"), Decimal("0.02")):
+            rate = terms.contract_rate + delta
+            if rate >= 1:
+                continue
+            payment = (
+                mortgage.payment_cents
+                if not delta
+                else self.financial.mortgage(
+                    property_=property_,
+                    buyer=buyer,
+                    terms=MortgageTerms(
+                        contract_rate=rate, amortization_years=terms.amortization_years
+                    ),
+                    rules=self.rules,
+                    as_of=as_of,
+                ).value.payment_cents
+            )
+            scenarios.append(
+                RateScenarioOut(
+                    rate=float(rate),
+                    monthly_payment_cents=payment,
+                    monthly_ownership_cost_cents=ownership.total_monthly_cents
+                    - mortgage.payment_cents
+                    + payment,
+                    change_cents=payment - mortgage.payment_cents,
+                )
+            )
+        response.rate_scenarios = scenarios
 
     def _render(self, **kw: Any) -> AnalyzeResponse:
         buy: BuyScore = kw["buy"]
@@ -416,6 +599,37 @@ class AnalysisService:
         )
 
 
+def to_domain(
+    request: AnalyzeRequest,
+) -> tuple[PropertyFinancials, BuyerFinancials, MortgageTerms]:
+    """The engines' value objects for a request. Shared with the scenario service."""
+    property_ = PropertyFinancials(
+        purchase_price_cents=cents(request.property.purchase_price_cents),
+        jurisdiction=request.property.jurisdiction,
+        property_kind=PropertyKind(request.property.property_kind),
+        annual_property_tax_cents=_opt_cents(request.property.annual_property_tax_cents),
+        monthly_condo_fee_cents=_opt_cents(request.property.monthly_condo_fee_cents),
+        square_feet=request.property.square_feet,
+        is_new_build=request.property.is_new_build,
+    )
+    buyer = BuyerFinancials(
+        gross_annual_income_cents=cents(request.buyer.gross_annual_income_cents),
+        household_income_cents=cents(request.buyer.household_income_cents),
+        monthly_debt_payments_cents=cents(request.buyer.monthly_debt_payments_cents),
+        down_payment_cents=cents(request.buyer.down_payment_cents),
+        available_savings_cents=cents(request.buyer.available_savings_cents),
+        emergency_fund_cents=cents(request.buyer.emergency_fund_cents),
+        desired_max_monthly_cents=_opt_cents(request.buyer.desired_max_monthly_cents),
+        first_time_buyer=request.buyer.first_time_buyer,
+        residency_status=ResidencyStatus(request.buyer.residency_status),
+    )
+    terms = MortgageTerms(
+        contract_rate=request.terms.contract_rate,
+        amortization_years=request.terms.amortization_years,
+    )
+    return property_, buyer, terms
+
+
 def _bucket(factors: dict[str, list[FactorOut]], factor: Factor) -> None:
     out = FactorOut(
         component=factor.component.value,
@@ -473,6 +687,11 @@ def _jsonable(value: Any) -> Any:
     if hasattr(value, "__dataclass_fields__"):
         return _jsonable(asdict(value))
     return value
+
+
+def inputs_hash_for(request: AnalyzeRequest, rule_set: str, model_version: str) -> str:
+    """Public name for the fingerprint, used to spot a repeated analysis."""
+    return _inputs_hash(request, rule_set, model_version)
 
 
 def _inputs_hash(request: AnalyzeRequest, rule_set: str, model_version: str) -> str:

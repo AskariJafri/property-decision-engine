@@ -27,6 +27,9 @@ class OpenAICompatibleProvider:
     def __init__(self, settings: Settings, client: httpx.AsyncClient | None = None) -> None:
         self._settings = settings
         self._client = client
+        self.last_usage: dict[str, Any] | None = None
+        """Token counts from the last response, when the endpoint reports them. Read
+        by the API layer to estimate cost; never part of the explanation."""
 
     @property
     def model_id(self) -> str:
@@ -91,6 +94,8 @@ class OpenAICompatibleProvider:
             )
             response.raise_for_status()
             body = response.json()
+            usage = body.get("usage") if isinstance(body, dict) else None
+            self.last_usage = usage if isinstance(usage, dict) else None
         except httpx.HTTPError as exc:
             raise LlmUnavailableError(f"The model could not be reached: {exc}") from exc
         finally:

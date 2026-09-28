@@ -1,9 +1,15 @@
-# Runtime only. The database stack (sqlalchemy, alembic, asyncpg, geoalchemy2)
-# is deliberately absent: nothing on the analyze path imports it, and shipping it
-# would quadruple a bundle that has to fit a free tier.
+# Runtime only. The database stack arrived with accounts and metered analyses:
+# an analysis now draws on a credit ledger, so the analyze path needs Postgres.
+# alembic stays out of the runtime bundle; migrations run from a developer
+# machine or CI, never from the serverless function.
 fastapi>=0.115
 pydantic>=2.9
 pydantic-settings>=2.6
 httpx>=0.28
 python-multipart>=0.0.12
 pypdf>=5.1
+sqlalchemy[asyncio]>=2.0.36
+asyncpg>=0.30
+geoalchemy2>=0.15
+argon2-cffi>=23.1
+cryptography>=43

@@ -1,9 +1,4 @@
-from fastapi.testclient import TestClient
-
 from app.engines.scoring.contracts import SCORING_MODEL_VERSION
-from app.main import create_app
-
-client = TestClient(create_app())
 
 REQUEST = {
     "property": {
@@ -66,19 +61,19 @@ REQUEST = {
 }
 
 
-def test_health():
+def test_health(client):
     body = client.get("/api/v1/health").json()
     assert body["status"] == "ok"
     assert body["pilot_jurisdiction"] == "ON/Toronto"
     assert body["scoring_model_version"] == SCORING_MODEL_VERSION
 
 
-def test_openapi_is_served_under_the_versioned_prefix():
+def test_openapi_is_served_under_the_versioned_prefix(client):
     paths = client.get("/api/v1/openapi.json").json()["paths"]
     assert "/api/v1/properties/analyze" in paths
 
 
-def test_analyze_returns_a_complete_analysis():
+def test_analyze_returns_a_complete_analysis(client):
     response = client.post("/api/v1/properties/analyze", json=REQUEST)
     assert response.status_code == 200, response.text
     body = response.json()
@@ -94,7 +89,7 @@ def test_analyze_returns_a_complete_analysis():
     assert "not financial" in body["disclaimer"]
 
 
-def test_the_same_request_produces_the_same_score_and_hash():
+def test_the_same_request_produces_the_same_score_and_hash(client):
     first = client.post("/api/v1/properties/analyze", json=REQUEST).json()
     second = client.post("/api/v1/properties/analyze", json=REQUEST).json()
     assert first["inputs_hash"] == second["inputs_hash"]
@@ -102,7 +97,7 @@ def test_the_same_request_produces_the_same_score_and_hash():
     assert first["scores"] == second["scores"]
 
 
-def test_comparables_narrow_the_range_and_raise_confidence():
+def test_comparables_narrow_the_range_and_raise_confidence(client):
     without = client.post("/api/v1/properties/analyze", json={**REQUEST, "comparables": []}).json()
     with_comps = client.post("/api/v1/properties/analyze", json=REQUEST).json()
 
@@ -114,7 +109,7 @@ def test_comparables_narrow_the_range_and_raise_confidence():
     assert "No comparable sales supplied" in without["fair_value"]["note"]
 
 
-def test_unavailable_components_are_named_not_hidden():
+def test_unavailable_components_are_named_not_hidden(client):
     body = client.post("/api/v1/properties/analyze", json=REQUEST).json()
     unavailable = {u.get("component") for u in body["unavailable"]}
     assert "location" in unavailable
@@ -122,14 +117,14 @@ def test_unavailable_components_are_named_not_hidden():
         assert entry["reason"], "a missing value must state why"
 
 
-def test_an_impossible_file_is_refused_with_the_engines_own_words():
+def test_an_impossible_file_is_refused_with_the_engines_own_words(client):
     bad = {**REQUEST, "buyer": {**REQUEST["buyer"], "down_payment_cents": 1_000_000}}
     response = client.post("/api/v1/properties/analyze", json=bad)
     assert response.status_code == 422
     assert "minimum" in response.json()["detail"]
 
 
-def test_reference_rules_shows_the_brackets_and_their_sources():
+def test_reference_rules_shows_the_brackets_and_their_sources(client):
     body = client.get("/api/v1/reference/rules?jurisdiction=ON/Toronto").json()
     names = {rule["name"] for rule in body["rules"]}
     assert "ltt.brackets.sfr" in names and "mltt.brackets.sfr" in names
@@ -140,7 +135,7 @@ def test_reference_rules_shows_the_brackets_and_their_sources():
     assert body["excluded_unverified"]
 
 
-def test_reference_rules_respects_the_as_of_date():
+def test_reference_rules_respects_the_as_of_date(client):
     before = client.get("/api/v1/reference/rules?jurisdiction=ON/Toronto&as_of=2026-03-31").json()
     after = client.get("/api/v1/reference/rules?jurisdiction=ON/Toronto&as_of=2026-04-01").json()
 
@@ -150,14 +145,14 @@ def test_reference_rules_respects_the_as_of_date():
     assert len(mltt(after)["brackets"]) > len(mltt(before)["brackets"])
 
 
-def test_reference_sources_lists_the_prohibited_ones_too():
+def test_reference_sources_lists_the_prohibited_ones_too(client):
     sources = client.get("/api/v1/reference/sources").json()["sources"]
     prohibited = [s for s in sources if s["licence_class"] == "prohibited"]
     assert prohibited, "the refusal is part of the record"
     assert all(s["may_store_values"] is False for s in prohibited)
 
 
-def test_the_browser_preflight_is_answered():
+def test_the_browser_preflight_is_answered(client):
     """Found by driving the real page: without CORS the browser never gets past
     the preflight, and the API looks fine to every test that is not a browser."""
     response = client.options(
@@ -172,7 +167,7 @@ def test_the_browser_preflight_is_answered():
     assert response.headers["access-control-allow-origin"] == "http://localhost:3000"
 
 
-def test_an_unknown_origin_is_not_allowed():
+def test_an_unknown_origin_is_not_allowed(client):
     response = client.options(
         "/api/v1/properties/analyze",
         headers={"Origin": "https://evil.example", "Access-Control-Request-Method": "POST"},
@@ -180,7 +175,7 @@ def test_an_unknown_origin_is_not_allowed():
     assert "access-control-allow-origin" not in response.headers
 
 
-def test_health_answers_head_as_well_as_get():
+def test_health_answers_head_as_well_as_get(client):
     """Monitors and load balancers probe with HEAD. A health endpoint that
     returns 405 to them reports itself unhealthy while being perfectly fine —
     which is exactly what happened in CI, twice."""

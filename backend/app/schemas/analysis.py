@@ -47,6 +47,11 @@ class BuyerIn(BaseModel):
     desired_max_monthly_cents: int | None = Field(default=None, gt=0)
     first_time_buyer: bool = False
     residency_status: Literal["citizen_or_pr", "foreign_national", "unknown"] = "unknown"
+    monthly_net_income_cents: int | None = Field(default=None, gt=0)
+    """Take-home pay, if the buyer knows it. Used only for "what is left"; the
+    lender ratios run on gross income, as lenders do."""
+
+    other_monthly_expenses_cents: int | None = Field(default=None, ge=0)
 
 
 class PropertyIn(BaseModel):
@@ -258,6 +263,46 @@ class ExplanationOut(BaseModel):
     source: str = "ai_inferred"
 
 
+DataBasis = Literal["known", "user_provided", "estimated", "assumption", "unavailable"]
+"""How a figure came to exist, in the words the page shows: known (published rules
+and your inputs, calculated), user-provided, estimated, an assumption, or
+unavailable."""
+
+
+class MonthlyLineOut(BaseModel):
+    key: str
+    label: str
+    amount_cents: int | None
+    basis: DataBasis
+    note: str = ""
+
+
+class MissingItemOut(BaseModel):
+    key: str
+    title: str
+    why_it_matters: str
+    what_to_ask_for: str
+    severity: Literal["high", "medium", "low"]
+    category: str
+
+
+class PersonalOut(BaseModel):
+    lines: list[MonthlyLineOut]
+    housing_share_of_gross: float
+    emergency_months: float | None
+    note: str = (
+        "Based on the information you provided. This describes your numbers; it is not "
+        "a recommendation."
+    )
+
+
+class RateScenarioOut(BaseModel):
+    rate: float
+    monthly_payment_cents: int
+    monthly_ownership_cost_cents: int
+    change_cents: int
+
+
 class AnalyzeResponse(BaseModel):
     """The analysis payload. ``buy_score`` is nullable on purpose."""
 
@@ -286,9 +331,25 @@ class AnalyzeResponse(BaseModel):
     explanation: ExplanationOut | None = None
     explanation_unavailable_reason: str | None = None
 
+    monthly_breakdown: list[MonthlyLineOut] = Field(default_factory=list)
+    money_labels: dict[str, DataBasis] = Field(default_factory=dict)
+    missing_info: list[MissingItemOut] = Field(default_factory=list)
+    personal: PersonalOut | None = None
+    rate_scenarios: list[RateScenarioOut] = Field(default_factory=list)
+
+    # Set by the metered API route, not by the engines.
+    analysis_id: str | None = None
+    created_at: str | None = None
+    duplicate: bool = False
+    """True when these exact inputs were analysed recently and the saved result was
+    returned instead — no credit consumed."""
+
+    usage: dict[str, Any] | None = None
+
     disclaimer: str = (
-        "This analysis is for informational purposes and is not financial, mortgage, legal, "
-        "tax, insurance, or home-inspection advice."
+        "Property Decision Engine provides estimates and informational analysis based on "
+        "the information and assumptions provided. Results are not financial, mortgage, "
+        "legal, tax, or real-estate advice. Actual costs and eligibility may differ."
     )
 
 

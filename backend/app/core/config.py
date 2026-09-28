@@ -102,6 +102,45 @@ class Settings(BaseSettings):
     analysis_rate_limit_per_hour: int = 10
     listing_parse_rate_limit_per_day: int = 20
 
+    # --- accounts, billing and cost control --------------------------------------
+
+    data_encryption_key: str = ""
+    """Fernet key for the encrypted columns (a household's inputs and results).
+
+    Generate with ``python -c "from cryptography.fernet import Fernet;
+    print(Fernet.generate_key().decode())"``. Required outside local and CI; there a
+    key is derived from ``session_secret`` so a fresh checkout runs without setup.
+    Rotating it makes every stored analysis unreadable, so it is set once.
+    """
+
+    bootstrap_admin_emails: str = ""
+    """Comma-separated. Accounts with these emails are promoted to admin when they
+    sign up or log in. Server-side only — the browser never sees this list."""
+
+    session_ttl_days: int = 30
+    auth_attempts_per_15_minutes: int = 10
+
+    stripe_secret_key: str = ""
+    """Blank means payments are not configured, and the product says so."""
+
+    stripe_webhook_secret: str = ""
+    public_app_url: str = "http://localhost:3000"
+    """Where Stripe sends the buyer back to after the hosted checkout."""
+
+    cron_secret: str = ""
+    """Bearer token for scheduled jobs (property watch refresh). Blank disables them."""
+
+    ai_daily_budget_cents: int = 500
+    """Estimated AI spend per day, across all users, after which explanations are
+    skipped (the figures never depend on them). Estimated from the admin's cost
+    assumptions; 0 means no cap."""
+
+    max_request_bytes: int = 6 * 1024 * 1024
+
+    @property
+    def is_deployed(self) -> bool:
+        return self.environment in ("staging", "production")
+
     @model_validator(mode="before")
     @classmethod
     def blank_means_unset(cls, data: Any) -> Any:

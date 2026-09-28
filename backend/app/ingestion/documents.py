@@ -19,7 +19,7 @@ from __future__ import annotations
 
 import io
 
-MAX_BYTES = 10 * 1024 * 1024
+MAX_BYTES = 5 * 1024 * 1024
 MAX_PAGES = 20
 
 PDF_TYPES = {"application/pdf"}

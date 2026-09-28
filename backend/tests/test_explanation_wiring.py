@@ -13,15 +13,11 @@ must cost the reader an explanation and nothing else. Every test here asserts a
 from typing import Any
 
 import pytest
-from fastapi.testclient import TestClient
 
 from app.ai.contracts import LlmUnavailableError
 from app.core.config import Settings, get_settings
-from app.main import create_app
 
 from .test_app import REQUEST
-
-client = TestClient(create_app())
 
 GOOD_OUTPUT: dict[str, Any] = {
     "summary": "The asking price sits inside the estimated fair-value range.",
@@ -70,7 +66,7 @@ def enabled(monkeypatch: pytest.MonkeyPatch):
     get_settings.cache_clear()
 
 
-def analyze() -> dict[str, Any]:
+def analyze(client) -> dict[str, Any]:
     response = client.post("/api/v1/properties/analyze", json=REQUEST)
     assert response.status_code == 200, response.text
     return response.json()
@@ -84,15 +80,15 @@ def assert_analysis_is_intact(body: dict[str, Any]) -> None:
 
 
 class TestOff:
-    def test_off_by_default_and_says_so(self):
+    def test_off_by_default_and_says_so(self, client):
         """A blank space where prose should be tells the reader nothing about
         whether an explanation was even attempted. Name it instead."""
-        body = analyze()
+        body = analyze(client)
         assert body["explanation"] is None
         assert "turned off" in body["explanation_unavailable_reason"]
         assert_analysis_is_intact(body)
 
-    def test_health_reports_the_switch_not_the_base_url(self):
+    def test_health_reports_the_switch_not_the_base_url(self, client):
         """The old flag was bool(llm_base_url) on a non-empty default, so it was
         true on deployments that had never seen a model."""
         body = client.get("/api/v1/health").json()
@@ -101,9 +97,9 @@ class TestOff:
 
 
 class TestOn:
-    def test_a_good_explanation_is_served_and_labelled_ai(self, enabled):
+    def test_a_good_explanation_is_served_and_labelled_ai(self, client, enabled):
         provider = enabled(GOOD_OUTPUT)
-        body = analyze()
+        body = analyze(client)
 
         assert provider.calls == 1
         assert body["explanation_unavailable_reason"] is None
@@ -116,49 +112,53 @@ class TestOn:
         assert explanation["source"] == "ai_inferred"
         assert_analysis_is_intact(body)
 
-    def test_an_invented_figure_discards_the_whole_explanation(self, enabled):
+    def test_an_invented_figure_discards_the_whole_explanation(self, client, enabled):
         """The guard is the reason a model is allowed near this at all. It never
         repairs output: a plausible invented number is worse than no prose."""
         enabled({**GOOD_OUTPUT, "summary": "Your monthly cost is $9,999,999."})
-        body = analyze()
+        body = analyze(client)
 
         assert body["explanation"] is None
         reason = body["explanation_unavailable_reason"]
         assert "never supplied" in reason and "9,999,999" in reason
         assert_analysis_is_intact(body)
 
-    def test_a_model_that_is_down_costs_only_the_prose(self, enabled):
+    def test_a_model_that_is_down_costs_only_the_prose(self, client, enabled):
         enabled(LlmUnavailableError("The model could not be reached: connect timeout"))
-        body = analyze()
+        body = analyze(client)
 
         assert body["explanation"] is None
         assert "could not be reached" in body["explanation_unavailable_reason"]
         assert_analysis_is_intact(body)
 
-    def test_an_unexpected_failure_is_contained(self, enabled):
+    def test_an_unexpected_failure_is_contained(self, client, enabled):
         """Anything the explainer did not anticipate still must not surface as a
         500 on an analysis that computed perfectly well."""
         enabled(RuntimeError("something nobody predicted"))
-        body = analyze()
+        body = analyze(client)
 
         assert body["explanation"] is None
         assert "failed unexpectedly" in body["explanation_unavailable_reason"]
         assert_analysis_is_intact(body)
 
-    def test_malformed_output_is_refused_rather_than_coerced(self, enabled):
+    def test_malformed_output_is_refused_rather_than_coerced(self, client, enabled):
         enabled({**GOOD_OUTPUT, "pros": "not a list"})
-        body = analyze()
+        body = analyze(client)
 
         assert body["explanation"] is None
         assert "not a list" in body["explanation_unavailable_reason"]
         assert_analysis_is_intact(body)
 
-    def test_the_model_cannot_move_a_single_figure(self, enabled):
+    def test_the_model_cannot_move_a_single_figure(self, client, enabled):
         """ADR 0004's core promise. The model is handed a finished analysis, so
         turning it on must change the prose and nothing else."""
-        without = analyze()
+        without = analyze(client)
         enabled(GOOD_OUTPUT)
-        with_prose = analyze()
+        # A second account: the same inputs from the same account within a day return
+        # the saved analysis (no second credit), which would hide the model entirely.
+        client.logout()
+        client.signup()
+        with_prose = analyze(client)
 
         assert with_prose["explanation"] is not None
         for field in ("buy_score", "confidence", "inputs_hash", "money", "scores", "fair_value"):

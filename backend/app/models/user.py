@@ -33,6 +33,7 @@ RESIDENCY = ("citizen_or_pr", "foreign_national", "unknown")
 HORIZONS = ("under_3", "3_to_5", "5_to_10", "over_10")
 GOALS = ("primary_residence", "investment", "house_hack", "mixed")
 RISK_POSTURES = ("conservative", "balanced", "aggressive")
+ROLES = ("user", "professional", "admin")
 
 
 class User(Base, TimestampMixin):
@@ -45,6 +46,14 @@ class User(Base, TimestampMixin):
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     """Set on a deletion request. A worker hard-deletes after the grace window —
     PIPEDA deletion has to actually delete, so this is a queue, not a tombstone."""
+
+    role: Mapped[str] = mapped_column(
+        Enum(*ROLES, name="user_role"), nullable=False, default="user", server_default="user"
+    )
+    """Read from this row on every request. Nothing the browser sends can set it;
+    only ``app.cli grant-role``, the bootstrap list, or another admin can."""
+
+    last_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class UserProfile(Base, TimestampMixin):

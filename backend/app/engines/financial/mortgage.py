@@ -93,6 +93,38 @@ def first_year_split(
     return cents(int(interest_total)), cents(int(principal_total))
 
 
+def schedule_by_year(
+    principal: Cents, periodic_rate: Decimal, payment: Cents, years: int
+) -> list[tuple[Cents, Cents, Cents]]:
+    """Interest paid, principal repaid and closing balance, for each year in turn.
+
+    The same month-by-month walk as :func:`first_year_split`, carried on for as
+    many years as a projection needs. The balance stops at zero once the loan is
+    retired; the years after that pay nothing.
+    """
+    balance = Decimal(principal)
+    rows: list[tuple[Cents, Cents, Cents]] = []
+    for _ in range(years):
+        interest_total = Decimal(0)
+        principal_total = Decimal(0)
+        for _ in range(MONTHS_PER_YEAR):
+            if balance <= 0:
+                break
+            interest = (balance * periodic_rate).quantize(Decimal("1"), rounding=ROUND_HALF_UP)
+            principal_part = min(Decimal(payment) - interest, balance)
+            interest_total += interest
+            principal_total += principal_part
+            balance -= principal_part
+        rows.append(
+            (
+                cents(int(interest_total)),
+                cents(int(principal_total)),
+                cents(int(balance) if balance > 0 else 0),
+            )
+        )
+    return rows
+
+
 def minimum_down_payment(price: Cents, rules: RuleSet, *, as_of: date) -> Cents:
     """The smallest down payment the insured-mortgage rules permit for this price.
 

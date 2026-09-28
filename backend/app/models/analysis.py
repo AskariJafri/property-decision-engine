@@ -25,6 +25,7 @@ from sqlalchemy import (
     Enum,
     Index,
     Integer,
+    LargeBinary,
     Numeric,
     SmallInteger,
     String,
@@ -78,10 +79,32 @@ class PropertyAnalysis(Base):
 
     id: Mapped[uuid.UUID] = uuid_pk()
     user_id: Mapped[uuid.UUID] = uuid_fk("users.id")
-    property_id: Mapped[uuid.UUID] = uuid_fk("properties.id")
-    financial_profile_id: Mapped[uuid.UUID] = uuid_fk("financial_profiles.id")
-    buyer_preferences_id: Mapped[uuid.UUID] = uuid_fk("buyer_preferences.id")
-    rule_set_id: Mapped[uuid.UUID] = uuid_fk("rule_sets.id")
+    # Nullable since the metered analyze path: an analysis is recorded from the
+    # request the user submitted (encrypted below) before the normalised property,
+    # profile and rule-set rows exist. They are filled when those land.
+    property_id: Mapped[uuid.UUID | None] = uuid_fk("properties.id", nullable=True)
+    financial_profile_id: Mapped[uuid.UUID | None] = uuid_fk("financial_profiles.id", nullable=True)
+    buyer_preferences_id: Mapped[uuid.UUID | None] = uuid_fk("buyer_preferences.id", nullable=True)
+    rule_set_id: Mapped[uuid.UUID | None] = uuid_fk("rule_sets.id", nullable=True)
+    rule_set_label: Mapped[str | None] = mapped_column(String(64))
+    title: Mapped[str | None] = mapped_column(String(400))
+    """What the user sees in their list: the address, or the price and type."""
+
+    purchase_price_cents = money(nullable=True)
+    request_encrypted: Mapped[bytes | None] = mapped_column(LargeBinary)
+    """The whole submitted request — income, debts, savings included. Encrypted."""
+
+    result_encrypted: Mapped[bytes | None] = mapped_column(LargeBinary)
+    credit_consumed: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )
+    credit_source: Mapped[str | None] = mapped_column(String(16))
+    """free, plan, promo or unlimited — how this run was paid for."""
+
+    derived_from_id: Mapped[uuid.UUID | None] = uuid_fk(
+        "property_analyses.id", nullable=True, ondelete="SET NULL"
+    )
+    """Set on a recalculation (a watched price change): the analysis it revised."""
 
     scoring_model_version: Mapped[str] = mapped_column(String(16), nullable=False)
     buy_score: Mapped[int | None] = mapped_column(SmallInteger)
