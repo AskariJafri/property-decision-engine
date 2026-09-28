@@ -1,13 +1,49 @@
-# Deploying it for free
+# Deploying it
 
-The analyze path touches no database. Nothing on it imports SQLAlchemy, Alembic or
-a driver — only FastAPI, Pydantic and httpx, with pypdf loaded lazily for uploads.
-That is why this deploys on free tiers that would otherwise be ruled out by a
-Postgres requirement: **21 runtime packages, no persistent storage, no state.**
+**Since accounts and metered analyses, the API needs Postgres.** An analysis draws on a
+credit ledger and is saved encrypted, so `POST /properties/analyze` cannot run without a
+database. The rest of this document still applies; the section below is the new part, and it
+comes first because deploying this code without it takes the analyze path down.
 
-Saved analyses, accounts and the rule registry in a database all arrive with
-Phase F/C work that is not built yet. Until then the app is a pure function of its
-request, which is inconvenient for a product and extremely convenient for hosting.
+## Accounts need a database — do this before deploying this release
+
+1. **Create a Postgres database.** Neon's free tier works (Vercel → Storage → Marketplace →
+   Neon, or neon.tech directly). PostGIS is required by the schema: run
+   `CREATE EXTENSION postgis;` once (Neon supports it).
+2. **Point the API at it** using the async driver and Neon's *pooled* host:
+   ```
+   PDE_DATABASE_URL = postgresql+asyncpg://USER:PASSWORD@HOST-pooler.../DB?ssl=require
+   ```
+3. **Run the migrations from your machine or CI** (never from the function):
+   ```bash
+   cd backend && PDE_DATABASE_URL=... alembic upgrade head
+   ```
+4. **Set the new API variables** (Vercel → backend project → Environment Variables):
+   ```
+   PDE_ENVIRONMENT          = production
+   PDE_SESSION_SECRET       = <python -c "import secrets; print(secrets.token_urlsafe(48))">
+   PDE_DATA_ENCRYPTION_KEY  = <Fernet key — see .env.example; set once, never rotate casually>
+   PDE_BOOTSTRAP_ADMIN_EMAILS = you@example.com
+   PDE_PUBLIC_APP_URL       = https://<web>.vercel.app
+   PDE_STRIPE_SECRET_KEY / PDE_STRIPE_WEBHOOK_SECRET   (optional — see MONETIZATION.md)
+   PDE_CRON_SECRET          (optional)
+   ```
+   Production refuses to store analyses without `PDE_DATA_ENCRYPTION_KEY`.
+5. **Point the web app's proxy at the API.** The browser now talks only to the web app, which
+   proxies `/api/*`, so the session cookie is first-party. Set on the web project, then
+   redeploy it:
+   ```
+   PDE_API_ORIGIN = https://<api>.vercel.app
+   ```
+   (An existing `NEXT_PUBLIC_API_BASE` is honoured as a fallback, so the current deployment
+   keeps its value.) CORS no longer matters for the browser path.
+6. **Sign up**, and you are an admin if your email is in `PDE_BOOTSTRAP_ADMIN_EMAILS`.
+
+**Vercel Hobby is for non-commercial use.** Taking payments requires moving the projects to
+Vercel Pro, or the API to Render (below), before the first charge.
+
+The runtime bundle grew from 6 to 11 direct requirements (SQLAlchemy, asyncpg, geoalchemy2,
+argon2-cffi, cryptography); Alembic stays out of it.
 
 ---
 
@@ -262,7 +298,8 @@ supplied by the user (ADR 0002).
 Free hosting is fine for showing someone. Before it takes a stranger's financial
 details:
 
-1. **Authentication and persistence** — Phase F. Right now there are no accounts
+1. **Authentication and persistence** — built (see above). Still missing: email verification
+   and password reset. Previously: there were no accounts
    and nothing is saved.
 2. **Rate limiting** — the analyze and upload endpoints are the expensive ones and
    are currently unthrottled in deployment.

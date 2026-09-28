@@ -29,13 +29,19 @@ guard discards the whole thing if a figure appears that was not supplied — so 
 verified or does not arrive at all. Every figure stays deterministic whether the model is on,
 off, or lying.
 
-Nothing is saved — there are no accounts yet.
+**Accounts and plans.** Analyses belong to an account: 5 free analyses, then Deep Dive
+reports, Property Watch and Professional plans (Stripe, not configured on the deployment), with
+an admin console for pricing, ads, feature switches and unit economics. See
+[`docs/MONETIZATION.md`](docs/MONETIZATION.md).
 
-**Run it:** two terminals, no database or Docker required.
+**Run it:** Postgres, then two terminals.
 
 ```bash
+docker compose up -d db
+cd backend && .venv/Scripts/alembic upgrade head
 cd backend && .venv/Scripts/uvicorn app.main:app --reload --port 8000
 cd web     && npm run dev          # then open http://localhost:3000
+cd backend && .venv/Scripts/python -m app.cli grant-role you@example.com admin   # after signing up
 ```
 
 Full setup, tests and the optional local model and OpenStreetMap stack:
@@ -61,6 +67,7 @@ Full setup, tests and the optional local model and OpenStreetMap stack:
 | [`docs/decisions/0003-toronto-pilot.md`](docs/decisions/0003-toronto-pilot.md) | Toronto as pilot city, and the sources it unlocks |
 | [`docs/decisions/0004-ai-judgements.md`](docs/decisions/0004-ai-judgements.md) | How AI improves the decision without touching the arithmetic |
 | [`docs/GLOSSARY.md`](docs/GLOSSARY.md) | Every term in plain language, for someone buying their first home |
+| [`docs/MONETIZATION.md`](docs/MONETIZATION.md) | Tiers, credit enforcement, admin setup, Stripe, ads, watch, analytics |
 | [`docs/DEPLOY.md`](docs/DEPLOY.md) | Free hosting, and why a stateless analyze path makes it possible |
 | [`docs/RUNBOOK.md`](docs/RUNBOOK.md) | How to run it, test it, and switch on the optional pieces |
 | [`docs/ROADMAP.md`](docs/ROADMAP.md) | Phases A–L, the first four weeks, and V1–V10 |
