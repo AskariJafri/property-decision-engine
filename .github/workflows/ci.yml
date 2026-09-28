@@ -107,9 +107,29 @@ jobs:
         run: pytest tests/integration -q
 
   frontend:
-    timeout-minutes: 15
-    name: Frontend — types, build, E2E
+    timeout-minutes: 20
+    name: Frontend — lint, types, build, E2E
     runs-on: ubuntu-latest
+
+    # Analyses belong to accounts now, so the API the E2E suite drives needs a
+    # real database behind it.
+    services:
+      postgres:
+        image: postgis/postgis:16-3.4
+        env:
+          POSTGRES_USER: pde
+          POSTGRES_PASSWORD: pde
+          POSTGRES_DB: pde
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U pde"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      PDE_DATABASE_URL: postgresql+asyncpg://pde:pde@localhost:5432/pde
 
     steps:
       - uses: actions/checkout@v4
@@ -132,17 +152,24 @@ jobs:
       - run: npx tsc --noEmit
         working-directory: web
 
-      # NEXT_PUBLIC_API_BASE is inlined at build time, so it has to be set here
-      # rather than before `next start`. Without it the production fallback is
-      # the empty string — same-origin — and the browser posts to the Next
-      # server on :3000 instead of the API on :8000. Every E2E test then fails
-      # for one reason that looks like eight different assertion failures.
+      - run: npm run lint
+        working-directory: web
+
+      # The browser only talks to the web app; /api/* is proxied to the API so the
+      # session cookie is first-party. PDE_API_ORIGIN is where the proxy points.
+      # NEXT_PUBLIC_AD_PLACEHOLDERS lets the suite check where ad slots may appear
+      # without an ad network.
       - run: npx next build
         working-directory: web
         env:
-          NEXT_PUBLIC_API_BASE: http://127.0.0.1:8000
+          PDE_API_ORIGIN: http://127.0.0.1:8000
+          NEXT_PUBLIC_AD_PLACEHOLDERS: "true"
 
       - run: pip install -e ".[dev]"
+        working-directory: backend
+
+      - name: Migrate the E2E database
+        run: alembic upgrade head
         working-directory: backend
 
       # The E2E suite exists because of what it caught: the API had no CORS
@@ -156,7 +183,7 @@ jobs:
         run: |
           echo "uvicorn: $(command -v uvicorn || echo 'NOT ON PATH')"
           (cd backend && nohup uvicorn app.main:app --host 127.0.0.1 --port 8000 > /tmp/api.log 2>&1 &)
-          (cd web && nohup npx next start -p 3000 > /tmp/web.log 2>&1 &)
+          (cd web && PDE_API_ORIGIN=http://127.0.0.1:8000 nohup npx next start -p 3000 > /tmp/web.log 2>&1 &)
           sleep 8
           # Printed before wait-on, not after: if the API died on startup its
           # traceback is the answer, and waiting ninety seconds to find that out

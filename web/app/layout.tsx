@@ -1,11 +1,17 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
+import { SessionProvider } from "@/components/Session";
+import { SiteHeader } from "@/components/SiteHeader";
+import { DISCLAIMER } from "@/lib/copy";
+
 export const metadata: Metadata = {
-  title: "Property Decision Engine",
+  title: "Property Decision Engine — know what a Canadian home will really cost you",
   description:
-    "Whether a property makes financial sense for you, with every number sourced.",
+    "Paste a Canadian property listing and understand the mortgage, closing costs, monthly carrying cost, affordability and financial risks based on your situation.",
 };
+
+export const viewport: Viewport = { width: "device-width", initialScale: 1 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -15,18 +21,17 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     // cause and cannot prevent. It does not mask mismatches in our own markup.
     <html lang="en-CA" suppressHydrationWarning>
       <body suppressHydrationWarning>
-        <header className="border-b border-line">
-          <div className="mx-auto max-w-5xl px-6 py-4">
-            <h1 className="text-sm uppercase tracking-widest text-muted">
-              Property Decision Engine
-            </h1>
-          </div>
-        </header>
-        <main className="mx-auto max-w-5xl px-6 py-8">{children}</main>
-        <footer className="mx-auto max-w-5xl px-6 py-10 text-xs text-muted max-w-prose">
-          This analysis is for informational purposes and is not financial, mortgage, legal,
-          tax, insurance, or home-inspection advice.
-        </footer>
+        <SessionProvider>
+          <SiteHeader />
+          <main className="mx-auto max-w-5xl px-4 py-8 sm:px-6">{children}</main>
+          <footer className="mx-auto max-w-5xl px-4 py-10 text-xs text-muted sm:px-6">
+            <p className="max-w-prose">{DISCLAIMER}</p>
+            <p className="mt-2 max-w-prose">
+              Closing-cost and land transfer tax rules currently cover Ontario. Mortgage
+              rules (stress test, CMHC insurance, down-payment minimums) are federal.
+            </p>
+          </footer>
+        </SessionProvider>
       </body>
     </html>
   );

@@ -160,7 +160,7 @@ export function Factors({ result }: { result: AnalyzeResponse }) {
             </li>
           ))}
           {result.factors.positive.length === 0 && (
-            <li className="text-sm text-muted">Nothing stood out in this property's favour.</li>
+            <li className="text-sm text-muted">Nothing stood out in this property&apos;s favour.</li>
           )}
         </ul>
       </div>

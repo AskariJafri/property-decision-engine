@@ -1,8 +1,15 @@
 import { expect, test } from "@playwright/test";
 
+import { signUp } from "./helpers";
+
 test.describe("analysis", () => {
+  // Analyses belong to an account now; each test starts signed in with 5 free credits.
+  test.beforeEach(async ({ page }) => {
+    await signUp(page);
+  });
+
   test("a complete analysis renders with its working", async ({ page }) => {
-    await page.goto("/");
+    await page.goto("/analyze");
     await page.getByRole("button", { name: /analyse this property/i }).click();
 
     // The score, and the verdict beside it. Targeted by test id rather than by
@@ -31,7 +38,7 @@ test.describe("analysis", () => {
   });
 
   test("a fair value is always a range, never a point", async ({ page }) => {
-    await page.goto("/");
+    await page.goto("/analyze");
     await page.getByRole("button", { name: /analyse this property/i }).click();
     await expect(page.getByText(/\$[\d,]+ – \$[\d,]+/)).toBeVisible();
   });
@@ -40,7 +47,7 @@ test.describe("analysis", () => {
     // Explanations are off unless a deployment turns them on, and the section
     // still has to appear: a blank space would leave a reader unable to tell
     // whether prose was attempted, failed, or was never part of the product.
-    await page.goto("/");
+    await page.goto("/analyze");
     await page.getByRole("button", { name: /analyse this property/i }).click();
     const section = page.getByRole("heading", { name: /in plain language/i }).locator("..");
     await expect(section).toBeVisible();
@@ -50,7 +57,7 @@ test.describe("analysis", () => {
   });
 
   test("an impossible down payment is refused with a readable reason", async ({ page }) => {
-    await page.goto("/");
+    await page.goto("/analyze");
     await page.getByLabel("Down payment").fill("10000");
     await page.getByRole("button", { name: /analyse this property/i }).click();
     await expect(page.getByText(/below the .* minimum/i)).toBeVisible();
